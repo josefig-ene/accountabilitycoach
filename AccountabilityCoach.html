@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workbook AI Processor</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            max-width: 800px; 
+            margin: 50px auto; 
+            padding: 30px; 
+            background: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 3px dashed #007cba;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #005a87;
+            background: #e3f2fd;
+        }
+        .upload-area.dragover {
+            border-color: #005a87;
+            background: #e3f2fd;
+            transform: scale(1.02);
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .upload-button {
+            background: #007cba;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .process-button {
+            background: #28a745;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            display: none;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .status.processing { background: #fff3cd; color: #856404; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .preview {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+            display: none;
+        }
+        input[type="email"] {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+            max-width: 300px;
+            font-size: 14px;
+        }
+        progress {
+            width: 100%;
+            height: 20px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AI Workbook Processor</h1>
+        <p>Upload your project workbook and let AI extract your complete 8-week accountability plan!</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <h3>📄 Drop your workbook here or click to upload</h3>
+            <p>Supports: PDF, DOC, DOCX, TXT, MD</p>
+            <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md">
+            <button class="upload-button" onclick="document.getElementById('fileInput').click()">
+                Choose File
+            </button>
+        </div>
+        
+        <div class="preview" id="preview">
+            <h3>📋 Document Preview:</h3>
+            <p><strong>File:</strong> <span id="fileName"></span></p>
+            <p><strong>Size:</strong> <span id="fileSize"></span></p>
+            <p><strong>Type:</strong> <span id="fileType"></span></p>
+            <p><strong>Email:</strong> <input type="email" id="userEmail" placeholder="Enter your email" required></p>
+            
+            <button class="process-button" id="processButton">
+                🚀 Process with AI
+            </button>
+        </div>
+        
+        <div class="status" id="status">
+            <h3 id="statusTitle"></h3>
+            <p id="statusMessage"></p>
+            <div id="progressDetails">
+                <progress id="progressBar" value="0" max="100" style="display: none;"></progress>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const processButton = document.getElementById('processButton');
+        const status = document.getElementById('status');
+        
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            const allowedTypes = [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'text/plain',
+                'text/markdown'
+            ];
+            if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx|txt|md)$/i)) {
+                showStatus('error', 'Invalid File Type', 'Please upload a PDF, DOC, DOCX, TXT, or MD file.');
+                return;
+            }
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+            document.getElementById('fileType').textContent = file.type || 'Unknown';
+            
+            preview.style.display = 'block';
+            processButton.style.display = 'inline-block';
+            
+            // Store file for processing
+            window.selectedFile = file;
+        }
+        
+        processButton.addEventListener('click', () => {
+            if (window.selectedFile) {
+                processDocument(window.selectedFile);
+            }
+        });
+        
+        async function processDocument(file) {
+            const email = document.getElementById('userEmail').value;
+            if (!email) {
+                showStatus('error', 'Missing Email', 'Please enter a valid email address.');
+                return;
+            }
+            
+            showStatus('processing', 'Processing Document', 'AI is analyzing your workbook...');
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.display = 'block';
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                progressBar.value = progress;
+                if (progress >= 100) clearInterval(interval);
+            }, 500);
+            
+            const formData = new FormData();
+            formData.append('document', file);
+            formData.append('email', email);
+            
+            try {
+                // Replace with your N8N webhook URL
+                const response = await fetch('[YOUR_N8N_WEBHOOK_URL]', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    clearInterval(interval);
+                    progressBar.value = 100;
+                    showStatus('success', 'Processing Complete!', 
+                        `Successfully extracted ${result.weeks_found} weeks of tasks. Check your email for the complete accountability plan!`);
+                } else {
+                    throw new Error('Processing failed');
+                }
+            } catch (error) {
+                clearInterval(interval);
+                progressBar.value = 0;
+                showStatus('error', 'Processing Error', 
+                    'Failed to process document. Please try again or contact support.');
+            }
+        }
+        
+        function showStatus(type, title, message) {
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            document.getElementById('statusTitle').textContent = title;
+            document.getElementById('statusMessage').textContent = message;
+            const progressBar = document.getElementById('progressBar');
+            if (type !== 'processing') {
+                progressBar.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
+```
