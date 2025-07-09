@@ -187,6 +187,7 @@
         });
         
         async function processDocument(file) {
+            const response = await fetch('http://localhost:5678/webhook/webhook/aicn-processor', {
             const email = document.getElementById('userEmail').value;
             if (!email) {
                 showStatus('error', 'Missing Email', 'Please enter a valid email address.');
