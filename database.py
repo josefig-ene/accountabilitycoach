@@ -1,21 +1,44 @@
 """
 Database module for CEO Dashboard
 Handles SQLite operations for Ideas, Milestones, Offers, and Energy Tracking
+Supports both local SQLite and Turso (cloud SQLite)
 """
 
 import sqlite3
 import uuid
+import os
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+
+# Check if we should use Turso (cloud) or local SQLite
+USE_TURSO = os.getenv("TURSO_DATABASE_URL") is not None
+
+if USE_TURSO:
+    try:
+        import libsql_experimental as libsql
+    except ImportError:
+        print("Warning: libsql_experimental not found. Install with: pip install libsql-experimental")
+        USE_TURSO = False
 
 
 class Database:
     def __init__(self, db_path: str = "ceo_dashboard.db"):
         self.db_path = db_path
+        self.use_turso = USE_TURSO
+
+        if self.use_turso:
+            self.turso_url = os.getenv("TURSO_DATABASE_URL")
+            self.turso_token = os.getenv("TURSO_AUTH_TOKEN")
+            print(f"✅ Using Turso cloud database")
+        else:
+            print(f"✅ Using local SQLite database: {db_path}")
+
         self.init_database()
 
     def get_connection(self):
         """Create a database connection"""
+        if self.use_turso:
+            return libsql.connect(database=self.turso_url, auth_token=self.turso_token)
         return sqlite3.connect(self.db_path)
 
     def init_database(self):

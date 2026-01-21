@@ -3,6 +3,10 @@ CEO Dashboard - Three Engines of Life
 Track Venture Studio (Wealth), Cohort Business (Cashflow), and Personal Sustainability (Longevity)
 """
 
+# Load environment variables from .env file (for local development)
+from dotenv import load_dotenv
+load_dotenv()
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
