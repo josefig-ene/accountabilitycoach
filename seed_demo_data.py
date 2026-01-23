@@ -21,7 +21,9 @@ def seed_demo_data():
         name="AI-Powered CRM",
         description="Customer relationship management system with AI-driven insights and predictive analytics",
         stage="mvp",
-        owner="Sarah Chen"
+        owner="Sarah Chen",
+        next_steps="Finalize pilot agreements, prepare onboarding materials",
+        risk_flags=""
     )
     db.add_milestone(idea1_id, "10 customer interviews", "market", "done", 3)
     db.add_milestone(idea1_id, "Build MVP prototype", "tech", "done", 5)
@@ -33,7 +35,9 @@ def seed_demo_data():
         name="Blockchain Supply Chain",
         description="Transparent supply chain tracking using blockchain technology",
         stage="validation",
-        owner="Marcus Johnson"
+        owner="Marcus Johnson",
+        next_steps="Complete technical feasibility study, reach out to potential partners",
+        risk_flags="Regulatory uncertainty, High technical complexity"
     )
     db.add_milestone(idea2_id, "Market research", "market", "done", 2)
     db.add_milestone(idea2_id, "Technical feasibility study", "tech", "done", 3)
@@ -45,7 +49,9 @@ def seed_demo_data():
         name="EdTech Personalized Learning",
         description="Adaptive learning platform for K-12 education",
         stage="pilot",
-        owner="Lisa Rodriguez"
+        owner="Lisa Rodriguez",
+        next_steps="Analyze pilot results, prepare for scale phase",
+        risk_flags=""
     )
     db.add_milestone(idea3_id, "Core platform development", "tech", "done", 5)
     db.add_milestone(idea3_id, "Pilot with 3 schools", "business", "in_progress", 4)
@@ -57,7 +63,9 @@ def seed_demo_data():
         name="HealthTech Wearable",
         description="Continuous health monitoring device with AI diagnostics",
         stage="seed",
-        owner="Dr. James Park"
+        owner="Dr. James Park",
+        next_steps="Validate product concept with target users, research hardware partners",
+        risk_flags="FDA approval required, High development cost"
     )
     db.add_milestone(idea4_id, "Product concept validation", "market", "not_started", 2)
     db.add_milestone(idea4_id, "Hardware prototype", "tech", "not_started", 5)
@@ -68,7 +76,9 @@ def seed_demo_data():
         name="SaaS Analytics Dashboard",
         description="Real-time business intelligence for SaaS companies",
         stage="scale",
-        owner="Sarah Chen"
+        owner="Sarah Chen",
+        next_steps="Build sales team, expand to enterprise segment",
+        risk_flags=""
     )
     db.add_milestone(idea5_id, "MVP launched", "tech", "done", 5)
     db.add_milestone(idea5_id, "Acquired 50+ customers", "business", "done", 5)

@@ -55,10 +55,23 @@ class Database:
                 stage TEXT NOT NULL CHECK(stage IN ('seed', 'validation', 'mvp', 'pilot', 'scale', 'exit')),
                 owner TEXT,
                 confidence_score INTEGER DEFAULT 0,
+                next_steps TEXT,
+                risk_flags TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Migrate existing tables - add new columns if they don't exist
+        try:
+            cursor.execute("ALTER TABLE ideas ADD COLUMN next_steps TEXT")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        try:
+            cursor.execute("ALTER TABLE ideas ADD COLUMN risk_flags TEXT")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
         # Milestones table
         cursor.execute("""
@@ -105,16 +118,17 @@ class Database:
 
     # ===== IDEAS METHODS =====
 
-    def add_idea(self, name: str, description: str, stage: str, owner: str) -> str:
+    def add_idea(self, name: str, description: str, stage: str, owner: str,
+                 next_steps: str = "", risk_flags: str = "") -> str:
         """Add a new idea"""
         conn = self.get_connection()
         cursor = conn.cursor()
         idea_id = str(uuid.uuid4())
 
         cursor.execute("""
-            INSERT INTO ideas (id, name, description, stage, owner)
-            VALUES (?, ?, ?, ?, ?)
-        """, (idea_id, name, description, stage, owner))
+            INSERT INTO ideas (id, name, description, stage, owner, next_steps, risk_flags)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (idea_id, name, description, stage, owner, next_steps, risk_flags))
 
         conn.commit()
         conn.close()
@@ -137,8 +151,10 @@ class Database:
                 'stage': row[3],
                 'owner': row[4],
                 'confidence_score': self.calculate_confidence_score(row[0]),
-                'created_at': row[6],
-                'updated_at': row[7]
+                'next_steps': row[6] if len(row) > 6 else "",
+                'risk_flags': row[7] if len(row) > 7 else "",
+                'created_at': row[8] if len(row) > 8 else row[6],
+                'updated_at': row[9] if len(row) > 9 else row[7]
             }
             ideas.append(idea)
 
@@ -162,8 +178,10 @@ class Database:
                 'stage': row[3],
                 'owner': row[4],
                 'confidence_score': self.calculate_confidence_score(row[0]),
-                'created_at': row[6],
-                'updated_at': row[7]
+                'next_steps': row[6] if len(row) > 6 else "",
+                'risk_flags': row[7] if len(row) > 7 else "",
+                'created_at': row[8] if len(row) > 8 else row[6],
+                'updated_at': row[9] if len(row) > 9 else row[7]
             }
         return None
 
