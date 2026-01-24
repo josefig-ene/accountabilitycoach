@@ -1,8 +1,10 @@
 streamlit==1.31.0
 pandas==2.1.4
 plotly==5.18.0
-libsql-experimental==0.0.55
 python-dotenv==1.0.0
+
+# Optional: For Turso cloud database (requires Rust/Cargo to compile)
+# Uncomment if using Turso: libsql-experimental==0.0.55
 
 # Optional: For advanced AI insights (GPT-4)
 # Uncomment and add OPENAI_API_KEY to .env to enable
