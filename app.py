@@ -932,6 +932,32 @@ def main():
 
     st.sidebar.markdown("---")
 
+    # Help section
+    with st.sidebar.expander("📖 Quick Help"):
+        st.markdown("""
+        **🚀 Studio Cockpit**
+        - Track ideas from seed to exit
+        - Add milestones to boost confidence
+        - Use risk flags for blockers
+
+        **💼 Cohort Lab**
+        - Manage cohort offers
+        - Track 3 key metrics (0-100)
+        - Monitor performance trends
+
+        **🌿 Sustainability**
+        - Log daily energy (1-10)
+        - Track 5 dimensions
+        - Identify patterns
+
+        **💡 Tips**
+        - Export data regularly (📄 buttons)
+        - Use Admin Panel for insights
+        - See USER_GUIDE.md for details
+        """)
+
+    st.sidebar.markdown("---")
+
     # Database indicator
     if db.use_turso:
         st.sidebar.success("☁️ Using Turso Cloud")
