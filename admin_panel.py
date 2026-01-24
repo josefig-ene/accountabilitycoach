@@ -388,12 +388,14 @@ def system_settings(db: Database):
 
     stats = db.get_database_stats()
 
-    st.write(f"**Total Records:** {sum([
+    total_records = sum([
         stats['total_ideas'],
         stats['total_milestones'],
         stats['total_offers'],
         stats['total_energy_entries']
-    ])}")
+    ])
+
+    st.write(f"**Total Records:** {total_records}")
 
     st.markdown("---")
 

@@ -3,3 +3,7 @@ pandas==2.1.4
 plotly==5.18.0
 libsql-experimental==0.3.1
 python-dotenv==1.0.0
+
+# Optional: For advanced AI insights (GPT-4)
+# Uncomment and add OPENAI_API_KEY to .env to enable
+# openai==1.12.0

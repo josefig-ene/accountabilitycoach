@@ -13,6 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, date, timedelta
 from database import Database
+from admin_panel import admin_panel
 import io
 
 # Page configuration
@@ -212,6 +213,117 @@ st.markdown("""
     .wealth { background-color: #8b4513; color: white; }
     .cashflow { background-color: #2c7a7b; color: white; }
     .longevity { background-color: #742a2a; color: white; }
+
+    /* Mobile Responsiveness */
+    @media (max-width: 768px) {
+        /* Adjust padding for mobile */
+        .main {
+            padding: 0.5rem 0.5rem;
+        }
+
+        /* Stack columns on mobile */
+        .row-widget.stHorizontal {
+            flex-direction: column;
+        }
+
+        /* Full width buttons on mobile */
+        .stButton>button {
+            width: 100%;
+            margin: 0.25rem 0;
+        }
+
+        /* Smaller headers on mobile */
+        h1 {
+            font-size: 1.8rem !important;
+        }
+
+        h2 {
+            font-size: 1.4rem !important;
+        }
+
+        h3 {
+            font-size: 1.2rem !important;
+        }
+
+        /* Compact metrics on mobile */
+        div[data-testid="stMetricValue"] {
+            font-size: 20px;
+        }
+
+        /* Smaller Kanban cards */
+        .kanban-card {
+            padding: 0.75rem;
+            margin: 0.25rem 0;
+        }
+
+        /* Single column Kanban on very small screens */
+        .kanban-column {
+            min-width: 100%;
+            margin-bottom: 1rem;
+        }
+
+        /* Adjust form inputs */
+        .stTextInput>div>div>input,
+        .stTextArea>div>div>textarea {
+            font-size: 16px; /* Prevent zoom on iOS */
+        }
+
+        /* Compact sidebar */
+        [data-testid="stSidebar"] {
+            width: 250px;
+        }
+
+        /* Subtitle text */
+        .subtitle {
+            font-size: 0.95rem;
+        }
+    }
+
+    /* Tablet responsiveness */
+    @media (min-width: 769px) and (max-width: 1024px) {
+        .main {
+            padding: 0.75rem 0.75rem;
+        }
+
+        /* Adjust Kanban for tablets - 3 columns */
+        .kanban-column {
+            flex: 0 0 32%;
+        }
+
+        h1 {
+            font-size: 2.2rem !important;
+        }
+    }
+
+    /* Large screen optimization */
+    @media (min-width: 1440px) {
+        .main {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .kanban-column {
+            min-height: 500px;
+        }
+    }
+
+    /* Touch-friendly spacing for mobile/tablet */
+    @media (hover: none) and (pointer: coarse) {
+        .stButton>button {
+            min-height: 44px; /* Minimum touch target */
+            padding: 0.75rem 1rem;
+        }
+
+        .kanban-card {
+            min-height: 44px;
+        }
+
+        /* Larger tap targets for icons */
+        button {
+            min-width: 44px;
+            min-height: 44px;
+        }
+    }
 
     </style>
     """, unsafe_allow_html=True)
@@ -903,6 +1015,12 @@ def main():
 
     st.sidebar.markdown("---")
 
+    # Admin section
+    st.sidebar.markdown("### ADMIN")
+    admin_page = st.sidebar.button("⚙️ Admin Panel", use_container_width=True)
+
+    st.sidebar.markdown("---")
+
     # Database indicator
     if db.use_turso:
         st.sidebar.success("☁️ Using Turso Cloud")
@@ -912,7 +1030,9 @@ def main():
     st.sidebar.caption("Built with Streamlit & Turso")
 
     # Route to appropriate page
-    if page == "🚀 Studio Cockpit":
+    if admin_page:
+        admin_panel(db)
+    elif page == "🚀 Studio Cockpit":
         studio_cockpit()
     elif page == "💼 Cohort Lab":
         cohort_lab()
