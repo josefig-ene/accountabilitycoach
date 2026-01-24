@@ -15,7 +15,7 @@ from datetime import datetime, date, timedelta
 from database import Database
 from admin_panel import admin_panel
 import io
-import html
+import streamlit.components.v1 as components
 
 # Page configuration
 st.set_page_config(
@@ -468,52 +468,102 @@ def studio_cockpit():
             }
 
             # Build HTML for horizontal scrollable Kanban board
-            kanban_html = '<div class="kanban-board">'
+            kanban_html = """
+            <style>
+                .kanban-board-container {
+                    display: flex;
+                    overflow-x: auto;
+                    gap: 1rem;
+                    padding: 1rem 0;
+                }
+                .kanban-board-container::-webkit-scrollbar {
+                    height: 8px;
+                }
+                .kanban-board-container::-webkit-scrollbar-track {
+                    background: #1a1f2e;
+                    border-radius: 4px;
+                }
+                .kanban-board-container::-webkit-scrollbar-thumb {
+                    background: #667eea;
+                    border-radius: 4px;
+                }
+                .kb-column-wrap {
+                    min-width: 280px;
+                    flex-shrink: 0;
+                }
+                .kb-header {
+                    font-weight: 700;
+                    font-size: 0.9rem;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    margin-bottom: 1rem;
+                    padding-bottom: 0.5rem;
+                    border-bottom: 2px solid;
+                    color: #e0e6ed;
+                }
+                .kb-column {
+                    background-color: #1a1f2e;
+                    padding: 1rem;
+                    border-radius: 10px;
+                    border: 1px solid #2d3748;
+                    min-height: 400px;
+                }
+                .kb-card {
+                    padding: 1rem;
+                    border-radius: 8px;
+                    background: linear-gradient(135deg, #1e2936 0%, #2d3748 100%);
+                    margin: 0.5rem 0;
+                    border-left: 4px solid;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    transition: all 0.3s;
+                }
+                .kb-card:hover {
+                    transform: translateY(-4px);
+                    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+                }
+                .kb-empty {
+                    text-align: center;
+                    color: #4a5568;
+                    padding: 2rem;
+                }
+            </style>
+            <div class="kanban-board-container">
+            """
 
             for stage in stages:
                 stage_ideas = [i for i in ideas if i['stage'] == stage]
 
-                kanban_html += f'''
-                <div class="kanban-column-wrapper">
-                    <div class="kanban-header" style="border-color: {stage_colors[stage]};">{stage_labels[stage]}</div>
-                    <div class="kanban-column">
-                '''
+                kanban_html += f'<div class="kb-column-wrap">'
+                kanban_html += f'<div class="kb-header" style="border-color: {stage_colors[stage]};">{stage_labels[stage]}</div>'
+                kanban_html += f'<div class="kb-column">'
 
                 if stage_ideas:
                     for idea in stage_ideas:
-                        confidence_color = (
-                            "🟢" if idea['confidence_score'] >= 70
-                            else "🟡" if idea['confidence_score'] >= 40
-                            else "🔴"
-                        )
-
+                        confidence_color = "🟢" if idea['confidence_score'] >= 70 else "🟡" if idea['confidence_score'] >= 40 else "🔴"
                         risk_badge = " ⚠️" if idea.get('risk_flags', '') else ""
 
-                        # Escape all text content to prevent HTML injection
-                        escaped_name = html.escape(str(idea['name']))
-                        escaped_owner = html.escape(str(idea['owner']))
+                        name = str(idea['name']).replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#39;')
+                        owner = str(idea['owner']).replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#39;')
 
                         kanban_html += f'''
-                        <div class='kanban-card stage-{stage}'>
-                            <div style='font-weight: 600; margin-bottom: 0.5rem;'>{escaped_name}{risk_badge}</div>
-                            <div style='font-size: 0.85rem; color: #a8b3cf; margin-bottom: 0.3rem;'>
+                        <div class="kb-card" style="border-left-color: {stage_colors[stage]};">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem; color: #e0e6ed;">{name}{risk_badge}</div>
+                            <div style="font-size: 0.85rem; color: #a8b3cf; margin-bottom: 0.3rem;">
                                 {confidence_color} {idea['confidence_score']}% confidence
                             </div>
-                            <div style='font-size: 0.8rem; color: #718096;'>
-                                👤 {escaped_owner}
+                            <div style="font-size: 0.8rem; color: #718096;">
+                                👤 {owner}
                             </div>
                         </div>
                         '''
                 else:
-                    kanban_html += "<div style='text-align: center; color: #4a5568; padding: 2rem;'>No ideas</div>"
+                    kanban_html += '<div class="kb-empty">No ideas</div>'
 
-                kanban_html += '''
-                    </div>
-                </div>
-                '''
+                kanban_html += '</div></div>'
 
             kanban_html += '</div>'
-            st.markdown(kanban_html, unsafe_allow_html=True)
+
+            components.html(kanban_html, height=600, scrolling=False)
 
             # Action panel for idea management
             st.markdown("---")
