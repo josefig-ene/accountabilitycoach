@@ -13,63 +13,28 @@ import json
 def admin_panel(db: Database):
     """Admin Panel with CRUD and settings"""
 
-    # Admin panel specific styling for better contrast
+    # Clean admin panel styling
     st.markdown("""
         <style>
-        /* Admin panel text readability */
+        /* Admin panel - clean and readable */
         .stMarkdown, .stMarkdown p, .stMarkdown li {
-            color: #e0e6ed !important;
+            color: #ffffff !important;
         }
 
-        /* Form labels */
-        .stRadio > label,
-        .stCheckbox > label,
-        .stSelectbox > label,
-        .stTextInput > label,
-        .stTextArea > label,
-        .stNumberInput > label {
-            color: #e0e6ed !important;
+        /* All labels */
+        label {
+            color: #ffffff !important;
             font-weight: 500 !important;
         }
 
-        /* Radio button and checkbox text */
-        .stRadio [role="radiogroup"] label,
-        .stCheckbox [role="checkbox"] + div {
-            color: #e0e6ed !important;
-        }
-
-        /* Info boxes */
-        .stAlert {
-            background-color: #1e2936 !important;
-            border: 1px solid #2d3748 !important;
-            color: #e0e6ed !important;
+        /* Headings */
+        h1, h2, h3, h4 {
+            color: #ffffff !important;
         }
 
         /* Caption text */
         .stCaption {
-            color: #a8b3cf !important;
-        }
-
-        /* Headings */
-        .admin-panel h1, .admin-panel h2, .admin-panel h3, .admin-panel h4 {
-            color: #e0e6ed !important;
-        }
-
-        /* Table text */
-        .stDataFrame, .stDataFrame td, .stDataFrame th {
-            color: #e0e6ed !important;
-        }
-
-        /* Make form inputs more visible */
-        .stTextInput input, .stTextArea textarea, .stNumberInput input {
-            background-color: #1e2936 !important;
-            color: #e0e6ed !important;
-            border: 1px solid #667eea !important;
-        }
-
-        /* Color picker label */
-        .stColorPicker > label {
-            color: #e0e6ed !important;
+            color: #b8c5db !important;
         }
         </style>
     """, unsafe_allow_html=True)
