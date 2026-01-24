@@ -13,6 +13,68 @@ import json
 def admin_panel(db: Database):
     """Admin Panel with CRUD and settings"""
 
+    # Admin panel specific styling for better contrast
+    st.markdown("""
+        <style>
+        /* Admin panel text readability */
+        .stMarkdown, .stMarkdown p, .stMarkdown li {
+            color: #e0e6ed !important;
+        }
+
+        /* Form labels */
+        .stRadio > label,
+        .stCheckbox > label,
+        .stSelectbox > label,
+        .stTextInput > label,
+        .stTextArea > label,
+        .stNumberInput > label {
+            color: #e0e6ed !important;
+            font-weight: 500 !important;
+        }
+
+        /* Radio button and checkbox text */
+        .stRadio [role="radiogroup"] label,
+        .stCheckbox [role="checkbox"] + div {
+            color: #e0e6ed !important;
+        }
+
+        /* Info boxes */
+        .stAlert {
+            background-color: #1e2936 !important;
+            border: 1px solid #2d3748 !important;
+            color: #e0e6ed !important;
+        }
+
+        /* Caption text */
+        .stCaption {
+            color: #a8b3cf !important;
+        }
+
+        /* Headings */
+        .admin-panel h1, .admin-panel h2, .admin-panel h3, .admin-panel h4 {
+            color: #e0e6ed !important;
+        }
+
+        /* Table text */
+        .stDataFrame, .stDataFrame td, .stDataFrame th {
+            color: #e0e6ed !important;
+        }
+
+        /* Make form inputs more visible */
+        .stTextInput input, .stTextArea textarea, .stNumberInput input {
+            background-color: #1e2936 !important;
+            color: #e0e6ed !important;
+            border: 1px solid #667eea !important;
+        }
+
+        /* Color picker label */
+        .stColorPicker > label {
+            color: #e0e6ed !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="admin-panel">', unsafe_allow_html=True)
     st.markdown("<h1>⚙️ Admin Panel</h1>", unsafe_allow_html=True)
     st.markdown('<p class="subtitle">System Administration & Settings</p>', unsafe_allow_html=True)
 
@@ -39,6 +101,8 @@ def admin_panel(db: Database):
 
     with tab5:
         system_settings(db)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def stats_dashboard(db: Database):
@@ -319,41 +383,75 @@ def ui_customization(db: Database):
     current_theme = db.get_setting('theme', 'dark')
 
     theme_choice = st.radio(
-        "Theme",
-        ["dark", "light"],
+        "Select Theme",
+        ["Dark (Recommended)", "Light"],
         index=0 if current_theme == "dark" else 1,
-        horizontal=True
+        horizontal=True,
+        help="Choose your preferred theme. Dark theme is optimized for long sessions."
     )
 
-    if theme_choice != current_theme:
-        db.set_setting('theme', theme_choice)
-        st.success(f"Theme set to: {theme_choice}")
-        st.info("Refresh the page to apply changes")
+    theme_value = "dark" if "Dark" in theme_choice else "light"
+
+    if theme_value != current_theme:
+        db.set_setting('theme', theme_value)
+        st.success(f"✅ Theme updated to: {theme_value}")
+        st.info("💡 Refresh the page (F5) to see the changes")
 
     st.markdown("---")
 
     # Dashboard preferences
     st.markdown("### 📊 Dashboard Preferences")
 
-    show_confidence = st.checkbox("Show confidence scores on Kanban cards", value=True)
-    show_owner = st.checkbox("Show owner on Kanban cards", value=True)
-    show_risk_badges = st.checkbox("Show risk badges", value=True)
+    # Get current settings with defaults
+    current_show_confidence = db.get_setting('show_confidence', 'True') == 'True'
+    current_show_owner = db.get_setting('show_owner', 'True') == 'True'
+    current_show_risk = db.get_setting('show_risk_badges', 'True') == 'True'
 
-    if st.button("Save Preferences"):
-        db.set_setting('show_confidence', str(show_confidence))
-        db.set_setting('show_owner', str(show_owner))
-        db.set_setting('show_risk_badges', str(show_risk_badges))
-        st.success("Preferences saved!")
+    show_confidence = st.checkbox(
+        "Show confidence scores on Kanban cards",
+        value=current_show_confidence,
+        key="pref_confidence"
+    )
+    show_owner = st.checkbox(
+        "Show owner on Kanban cards",
+        value=current_show_owner,
+        key="pref_owner"
+    )
+    show_risk_badges = st.checkbox(
+        "Show risk badges",
+        value=current_show_risk,
+        key="pref_risk"
+    )
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.button("💾 Save Preferences", use_container_width=True):
+            db.set_setting('show_confidence', str(show_confidence))
+            db.set_setting('show_owner', str(show_owner))
+            db.set_setting('show_risk_badges', str(show_risk_badges))
+            st.success("✅ Preferences saved successfully!")
+            st.info("💡 Refresh to see changes")
+
+    with col2:
+        if st.button("🔄 Reset to Defaults", use_container_width=True):
+            db.set_setting('show_confidence', 'True')
+            db.set_setting('show_owner', 'True')
+            db.set_setting('show_risk_badges', 'True')
+            st.success("✅ Reset to default settings!")
+            st.rerun()
 
     st.markdown("---")
 
     # Color customization (preview only - would need CSS injection to apply)
     st.markdown("### 🌈 Color Customization (Preview)")
 
-    primary_color = st.color_picker("Primary Color", "#667eea")
-    secondary_color = st.color_picker("Secondary Color", "#764ba2")
+    col1, col2 = st.columns(2)
+    with col1:
+        primary_color = st.color_picker("Primary Color", "#667eea", help="Main accent color for buttons and highlights")
+    with col2:
+        secondary_color = st.color_picker("Secondary Color", "#764ba2", help="Secondary gradient color")
 
-    st.caption("Note: Color customization coming in future update")
+    st.caption("💡 Note: Color customization is coming in a future update. Current values are for preview only.")
 
 
 def system_settings(db: Database):
