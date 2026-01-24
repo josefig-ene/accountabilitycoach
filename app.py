@@ -903,6 +903,23 @@ def sustainability_dashboard():
                 st.rerun()
 
 
+def help_page():
+    """Display the user guide"""
+    st.markdown("<h1>📖 User Guide</h1>", unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">Complete guide to using the CEO Dashboard</p>', unsafe_allow_html=True)
+
+    try:
+        with open("USER_GUIDE.md", "r") as f:
+            guide_content = f.read()
+
+        # Display the markdown content
+        st.markdown(guide_content, unsafe_allow_html=True)
+
+    except FileNotFoundError:
+        st.error("USER_GUIDE.md not found. Please ensure the file exists in the project directory.")
+        st.info("You can find the user guide at: https://github.com/your-repo/USER_GUIDE.md")
+
+
 def main():
     """Main application"""
 
@@ -933,7 +950,10 @@ def main():
     st.sidebar.markdown("---")
 
     # Help section
-    with st.sidebar.expander("📖 Quick Help"):
+    st.sidebar.markdown("### HELP")
+    help_page_button = st.sidebar.button("📖 User Guide", use_container_width=True)
+
+    with st.sidebar.expander("💡 Quick Tips"):
         st.markdown("""
         **🚀 Studio Cockpit**
         - Track ideas from seed to exit
@@ -950,10 +970,10 @@ def main():
         - Track 5 dimensions
         - Identify patterns
 
-        **💡 Tips**
+        **💡 Pro Tips**
         - Export data regularly (📄 buttons)
         - Use Admin Panel for insights
-        - See USER_GUIDE.md for details
+        - Click "User Guide" for full docs
         """)
 
     st.sidebar.markdown("---")
@@ -967,7 +987,9 @@ def main():
     st.sidebar.caption("Built with Streamlit & Turso")
 
     # Route to appropriate page
-    if admin_page:
+    if help_page_button:
+        help_page()
+    elif admin_page:
         admin_panel(db)
     elif page == "🚀 Studio Cockpit":
         studio_cockpit()
