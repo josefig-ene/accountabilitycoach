@@ -15,6 +15,7 @@ from datetime import datetime, date, timedelta
 from database import Database
 from admin_panel import admin_panel
 import io
+import html
 
 # Page configuration
 st.set_page_config(
@@ -488,14 +489,18 @@ def studio_cockpit():
 
                         risk_badge = " ⚠️" if idea.get('risk_flags', '') else ""
 
+                        # Escape all text content to prevent HTML injection
+                        escaped_name = html.escape(str(idea['name']))
+                        escaped_owner = html.escape(str(idea['owner']))
+
                         kanban_html += f'''
                         <div class='kanban-card stage-{stage}'>
-                            <div style='font-weight: 600; margin-bottom: 0.5rem;'>{idea['name']}{risk_badge}</div>
+                            <div style='font-weight: 600; margin-bottom: 0.5rem;'>{escaped_name}{risk_badge}</div>
                             <div style='font-size: 0.85rem; color: #a8b3cf; margin-bottom: 0.3rem;'>
                                 {confidence_color} {idea['confidence_score']}% confidence
                             </div>
                             <div style='font-size: 0.8rem; color: #718096;'>
-                                👤 {idea['owner']}
+                                👤 {escaped_owner}
                             </div>
                         </div>
                         '''
