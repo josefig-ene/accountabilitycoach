@@ -89,6 +89,35 @@ st.markdown("""
         border: 1px solid #2d3748;
     }
 
+    /* Kanban board container */
+    .kanban-board {
+        display: flex;
+        overflow-x: auto;
+        gap: 1rem;
+        padding: 1rem 0;
+        margin: 0 -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .kanban-board::-webkit-scrollbar {
+        height: 8px;
+    }
+
+    .kanban-board::-webkit-scrollbar-track {
+        background: #1a1f2e;
+        border-radius: 4px;
+    }
+
+    .kanban-board::-webkit-scrollbar-thumb {
+        background: #667eea;
+        border-radius: 4px;
+    }
+
+    .kanban-board::-webkit-scrollbar-thumb:hover {
+        background: #764ba2;
+    }
+
     /* Kanban cards */
     .kanban-card {
         padding: 1rem;
@@ -103,6 +132,11 @@ st.markdown("""
     .kanban-card:hover {
         transform: translateY(-4px);
         box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    }
+
+    .kanban-column-wrapper {
+        min-width: 280px;
+        flex-shrink: 0;
     }
 
     .kanban-column {
@@ -256,10 +290,13 @@ st.markdown("""
             margin: 0.25rem 0;
         }
 
-        /* Single column Kanban on very small screens */
+        /* Smaller Kanban columns on mobile */
+        .kanban-column-wrapper {
+            min-width: 240px;
+        }
+
         .kanban-column {
-            min-width: 100%;
-            margin-bottom: 1rem;
+            min-height: 300px;
         }
 
         /* Adjust form inputs */
@@ -285,9 +322,9 @@ st.markdown("""
             padding: 0.75rem 0.75rem;
         }
 
-        /* Adjust Kanban for tablets - 3 columns */
-        .kanban-column {
-            flex: 0 0 32%;
+        /* Adjust Kanban for tablets */
+        .kanban-column-wrapper {
+            min-width: 260px;
         }
 
         h1 {
@@ -429,55 +466,76 @@ def studio_cockpit():
                 'exit': '#742a2a'
             }
 
-            cols = st.columns(6)
+            # Build HTML for horizontal scrollable Kanban board
+            kanban_html = '<div class="kanban-board">'
 
-            for idx, stage in enumerate(stages):
-                with cols[idx]:
-                    st.markdown(f'<div class="kanban-header" style="border-color: {stage_colors[stage]};">{stage_labels[stage]}</div>', unsafe_allow_html=True)
+            for stage in stages:
+                stage_ideas = [i for i in ideas if i['stage'] == stage]
 
-                    stage_ideas = [i for i in ideas if i['stage'] == stage]
+                kanban_html += f'''
+                <div class="kanban-column-wrapper">
+                    <div class="kanban-header" style="border-color: {stage_colors[stage]};">{stage_labels[stage]}</div>
+                    <div class="kanban-column">
+                '''
 
-                    st.markdown(f'<div class="kanban-column">', unsafe_allow_html=True)
+                if stage_ideas:
+                    for idea in stage_ideas:
+                        confidence_color = (
+                            "🟢" if idea['confidence_score'] >= 70
+                            else "🟡" if idea['confidence_score'] >= 40
+                            else "🔴"
+                        )
 
-                    if stage_ideas:
-                        for idea in stage_ideas:
-                            confidence_color = (
-                                "🟢" if idea['confidence_score'] >= 70
-                                else "🟡" if idea['confidence_score'] >= 40
-                                else "🔴"
-                            )
+                        risk_badge = " ⚠️" if idea.get('risk_flags', '') else ""
 
-                            risk_badge = " ⚠️" if idea.get('risk_flags', '') else ""
-
-                            st.markdown(f"""
-                            <div class='kanban-card stage-{stage}'>
-                                <div style='font-weight: 600; margin-bottom: 0.5rem;'>{idea['name']}{risk_badge}</div>
-                                <div style='font-size: 0.85rem; color: #a8b3cf; margin-bottom: 0.3rem;'>
-                                    {confidence_color} {idea['confidence_score']}% confidence
-                                </div>
-                                <div style='font-size: 0.8rem; color: #718096;'>
-                                    👤 {idea['owner']}
-                                </div>
+                        kanban_html += f'''
+                        <div class='kanban-card stage-{stage}'>
+                            <div style='font-weight: 600; margin-bottom: 0.5rem;'>{idea['name']}{risk_badge}</div>
+                            <div style='font-size: 0.85rem; color: #a8b3cf; margin-bottom: 0.3rem;'>
+                                {confidence_color} {idea['confidence_score']}% confidence
                             </div>
-                            """, unsafe_allow_html=True)
+                            <div style='font-size: 0.8rem; color: #718096;'>
+                                👤 {idea['owner']}
+                            </div>
+                        </div>
+                        '''
+                else:
+                    kanban_html += "<div style='text-align: center; color: #4a5568; padding: 2rem;'>No ideas</div>"
 
-                            # Action buttons
-                            col_a, col_b = st.columns(2)
-                            with col_a:
-                                if st.button("📝", key=f"view_{idea['id']}", help="View details"):
-                                    with st.expander(f"Details: {idea['name']}", expanded=True):
-                                        st.write(f"**Description:** {idea.get('description', 'N/A')}")
-                                        st.write(f"**Next Steps:** {idea.get('next_steps', 'N/A')}")
-                                        st.write(f"**Risk Flags:** {idea.get('risk_flags', 'None')}")
-                                        st.write(f"**Confidence:** {idea['confidence_score']}%")
-                            with col_b:
-                                if st.button("🗑️", key=f"del_{idea['id']}", help="Delete"):
-                                    db.delete_idea(idea['id'])
-                                    st.rerun()
-                    else:
-                        st.markdown("<div style='text-align: center; color: #4a5568; padding: 2rem;'>No ideas</div>", unsafe_allow_html=True)
+                kanban_html += '''
+                    </div>
+                </div>
+                '''
 
-                    st.markdown('</div>', unsafe_allow_html=True)
+            kanban_html += '</div>'
+            st.markdown(kanban_html, unsafe_allow_html=True)
+
+            # Action panel for idea management
+            st.markdown("---")
+            st.markdown("### 🎯 Manage Ideas")
+
+            # Create dropdown to select and manage ideas
+            if ideas:
+                idea_names = {f"{i['name']} ({i['stage']})": i for i in ideas}
+                selected_idea_name = st.selectbox("Select an idea to manage:", list(idea_names.keys()))
+
+                if selected_idea_name:
+                    selected_idea = idea_names[selected_idea_name]
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        with st.expander(f"📝 View Details: {selected_idea['name']}", expanded=False):
+                            st.write(f"**Description:** {selected_idea.get('description', 'N/A')}")
+                            st.write(f"**Next Steps:** {selected_idea.get('next_steps', 'N/A')}")
+                            st.write(f"**Risk Flags:** {selected_idea.get('risk_flags', 'None')}")
+                            st.write(f"**Confidence:** {selected_idea['confidence_score']}%")
+                            st.write(f"**Owner:** {selected_idea['owner']}")
+
+                    with col2:
+                        if st.button("🗑️ Delete This Idea", key=f"del_manage_{selected_idea['id']}"):
+                            db.delete_idea(selected_idea['id'])
+                            st.success(f"Deleted '{selected_idea['name']}'")
+                            st.rerun()
 
             st.markdown("---")
 
