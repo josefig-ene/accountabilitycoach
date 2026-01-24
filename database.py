@@ -113,6 +113,15 @@ class Database:
             )
         """)
 
+        # Settings table (for UI customization and preferences)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         conn.commit()
         conn.close()
 
@@ -451,6 +460,110 @@ class Database:
         cursor = conn.cursor()
 
         cursor.execute("DELETE FROM energy_tracking WHERE id = ?", (entry_id,))
+
+        conn.commit()
+        conn.close()
+
+    # ===== SETTINGS METHODS =====
+
+    def get_setting(self, key: str, default: str = "") -> str:
+        """Get a setting value"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        result = cursor.fetchone()
+        conn.close()
+
+        return result[0] if result else default
+
+    def set_setting(self, key: str, value: str):
+        """Set a setting value"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT OR REPLACE INTO settings (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+        """, (key, value))
+
+        conn.commit()
+        conn.close()
+
+    def get_all_settings(self) -> Dict[str, str]:
+        """Get all settings"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT key, value FROM settings")
+        rows = cursor.fetchall()
+        conn.close()
+
+        return {row[0]: row[1] for row in rows}
+
+    # ===== ADMIN/BULK OPERATIONS =====
+
+    def get_database_stats(self) -> Dict[str, Any]:
+        """Get database statistics"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        stats = {}
+
+        # Count ideas
+        cursor.execute("SELECT COUNT(*) FROM ideas")
+        stats['total_ideas'] = cursor.fetchone()[0]
+
+        # Count milestones
+        cursor.execute("SELECT COUNT(*) FROM milestones")
+        stats['total_milestones'] = cursor.fetchone()[0]
+
+        # Count offers
+        cursor.execute("SELECT COUNT(*) FROM offers")
+        stats['total_offers'] = cursor.fetchone()[0]
+
+        # Count energy entries
+        cursor.execute("SELECT COUNT(*) FROM energy_tracking")
+        stats['total_energy_entries'] = cursor.fetchone()[0]
+
+        # Ideas by stage
+        cursor.execute("SELECT stage, COUNT(*) FROM ideas GROUP BY stage")
+        stats['ideas_by_stage'] = {row[0]: row[1] for row in cursor.fetchall()}
+
+        # Average confidence
+        cursor.execute("SELECT AVG(confidence_score) FROM ideas")
+        stats['avg_confidence'] = cursor.fetchone()[0] or 0
+
+        conn.close()
+        return stats
+
+    def delete_all_ideas(self):
+        """Delete all ideas and their milestones (DANGEROUS)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM milestones")
+        cursor.execute("DELETE FROM ideas")
+
+        conn.commit()
+        conn.close()
+
+    def delete_all_offers(self):
+        """Delete all offers (DANGEROUS)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM offers")
+
+        conn.commit()
+        conn.close()
+
+    def delete_all_energy_entries(self):
+        """Delete all energy tracking entries (DANGEROUS)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM energy_tracking")
 
         conn.commit()
         conn.close()
