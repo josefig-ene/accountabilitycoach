@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from database import Database
 from ai_insights import ai_insights
+from monday_import import MondayImporter
 import json
 
 
@@ -44,8 +45,9 @@ def admin_panel(db: Database):
     st.markdown('<p class="subtitle">System Administration & Settings</p>', unsafe_allow_html=True)
 
     # Tabs for different admin functions
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📊 Dashboard Stats",
+        "📥 Import Data",
         "🤖 AI Insights",
         "🗂️ Data Management",
         "🎨 UI Customization",
@@ -56,15 +58,18 @@ def admin_panel(db: Database):
         stats_dashboard(db)
 
     with tab2:
-        ai_insights_panel(db)
+        import_data_panel(db)
 
     with tab3:
-        data_management(db)
+        ai_insights_panel(db)
 
     with tab4:
-        ui_customization(db)
+        data_management(db)
 
     with tab5:
+        ui_customization(db)
+
+    with tab6:
         system_settings(db)
 
     st.markdown('</div>', unsafe_allow_html=True)
@@ -115,6 +120,240 @@ def stats_dashboard(db: Database):
             st.warning("🟡 Moderate portfolio health")
         else:
             st.error("🔴 Portfolio needs attention")
+
+
+def import_data_panel(db: Database):
+    """Import data from Monday.com and other sources"""
+
+    st.subheader("📥 Import Data from Monday.com")
+
+    st.markdown("""
+    Upload exported CSV or Excel files from Monday.com to import your projects and tasks.
+
+    **What gets imported:**
+    - 📊 **Projects** → Ideas in Studio Cockpit
+    - ✅ **Tasks** → Milestones for each idea
+    - 👤 **Owners** → Assigned to ideas
+    - 🎯 **Status** → Mapped to pipeline stages
+    """)
+
+    st.markdown("---")
+
+    # File uploader
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        uploaded_file = st.file_uploader(
+            "Upload Monday.com Export (CSV or Excel)",
+            type=['csv', 'xlsx', 'xls'],
+            help="Export your Monday.com board as CSV or Excel and upload it here"
+        )
+
+    with col2:
+        st.markdown("### 📄 Sample Format")
+        if st.button("Download Sample CSV", use_container_width=True):
+            from monday_import import create_sample_monday_csv
+            sample_csv = create_sample_monday_csv()
+            st.download_button(
+                label="⬇️ Get Sample File",
+                data=sample_csv,
+                file_name="monday_sample.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+    if uploaded_file is not None:
+        st.success(f"✅ File uploaded: {uploaded_file.name}")
+
+        try:
+            # Initialize importer
+            importer = MondayImporter()
+
+            # Determine file type
+            file_type = uploaded_file.name.split('.')[-1].lower()
+            if file_type == 'xlsx':
+                file_type = 'xlsx'
+            elif file_type == 'xls':
+                file_type = 'xls'
+            else:
+                file_type = 'csv'
+
+            # Parse file
+            file_content = uploaded_file.read()
+            df = importer.parse_file(file_content, file_type)
+
+            if df is not None and not df.empty:
+                st.success(f"✅ Parsed {len(df)} rows from file")
+
+                # Show preview of data
+                with st.expander("📋 View Raw Data Preview"):
+                    st.dataframe(df.head(10), use_container_width=True)
+
+                st.markdown("---")
+
+                # Import the data
+                ideas, errors, warnings = importer.import_from_dataframe(df)
+
+                # Show errors and warnings
+                if errors:
+                    st.error("❌ **Errors:**")
+                    for error in errors:
+                        st.error(f"• {error}")
+
+                if warnings:
+                    st.warning("⚠️ **Warnings:**")
+                    for warning in warnings:
+                        st.warning(f"• {warning}")
+
+                # Show import preview
+                if ideas:
+                    st.markdown("### 📊 Import Preview")
+
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Projects/Ideas", len(ideas))
+                    with col2:
+                        total_milestones = sum(len(idea.get('milestones', [])) for idea in ideas)
+                        st.metric("Total Milestones", total_milestones)
+                    with col3:
+                        stages = [idea['stage'] for idea in ideas]
+                        unique_stages = len(set(stages))
+                        st.metric("Stages Detected", unique_stages)
+
+                    st.markdown("---")
+
+                    # Show detailed preview
+                    st.markdown("### 📝 Detailed Preview")
+
+                    for idx, idea in enumerate(ideas[:10]):  # Show first 10
+                        with st.expander(f"🎯 {idea['name']} ({idea['stage'].upper()})"):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write(f"**Owner:** {idea['owner']}")
+                                st.write(f"**Stage:** {idea['stage']}")
+                                st.write(f"**Description:** {idea['description'][:100]}...")
+                            with col2:
+                                milestones = idea.get('milestones', [])
+                                st.write(f"**Milestones:** {len(milestones)}")
+                                if milestones:
+                                    st.write("**Tasks:**")
+                                    for m in milestones[:5]:
+                                        st.write(f"  • {m['name']} ({m['status']})")
+                                    if len(milestones) > 5:
+                                        st.write(f"  *...and {len(milestones) - 5} more*")
+
+                    if len(ideas) > 10:
+                        st.info(f"ℹ️ Showing 10 of {len(ideas)} projects. All will be imported.")
+
+                    st.markdown("---")
+
+                    # Import confirmation
+                    st.markdown("### ✅ Confirm Import")
+
+                    col1, col2, col3 = st.columns([2, 1, 1])
+
+                    with col1:
+                        import_mode = st.radio(
+                            "Import Mode",
+                            ["Add to existing data", "Replace all ideas (delete existing)"],
+                            help="Choose whether to add to or replace your current ideas"
+                        )
+
+                    with col2:
+                        st.write("")  # Spacing
+                        st.write("")  # Spacing
+
+                    with col3:
+                        st.write("")  # Spacing
+                        st.write("")  # Spacing
+
+                    # Import button
+                    if st.button("🚀 Import Data", type="primary", use_container_width=True):
+                        # Delete existing if replace mode
+                        if import_mode == "Replace all ideas (delete existing)":
+                            db.delete_all_ideas()
+                            st.info("🗑️ Deleted existing ideas")
+
+                        # Import ideas
+                        imported_count = 0
+                        milestone_count = 0
+
+                        for idea_data in ideas:
+                            # Extract milestones
+                            milestones = idea_data.pop('milestones', [])
+
+                            # Add idea
+                            idea_id = db.add_idea(
+                                name=idea_data['name'],
+                                description=idea_data['description'],
+                                stage=idea_data['stage'],
+                                owner=idea_data['owner'],
+                                next_steps=idea_data.get('next_steps', ''),
+                                risk_flags=idea_data.get('risk_flags', '')
+                            )
+
+                            imported_count += 1
+
+                            # Add milestones
+                            for milestone in milestones:
+                                db.add_milestone(
+                                    idea_id=idea_id,
+                                    milestone_name=milestone['name'],
+                                    status=milestone['status'],
+                                    weight=milestone['weight']
+                                )
+                                milestone_count += 1
+
+                        st.success(f"""
+                        ✅ **Import Complete!**
+
+                        - Imported {imported_count} ideas
+                        - Created {milestone_count} milestones
+
+                        Go to Studio Cockpit to view your imported projects!
+                        """)
+
+                        st.balloons()
+
+                else:
+                    st.warning("No data could be imported. Please check the file format.")
+
+            else:
+                st.error("❌ Could not parse the file. Please check the format.")
+
+        except Exception as e:
+            st.error(f"❌ Error processing file: {str(e)}")
+            st.info("💡 Make sure your file is a valid Monday.com export in CSV or Excel format.")
+
+    else:
+        # Show instructions when no file uploaded
+        st.info("""
+        ### 📖 How to Import from Monday.com
+
+        1. **Export from Monday.com:**
+           - Open your Monday.com board
+           - Click the menu (⋯) → Export → Excel or CSV
+           - Download the file
+
+        2. **Upload here:**
+           - Click "Browse files" above
+           - Select your exported file
+           - Review the preview
+
+        3. **Confirm import:**
+           - Choose import mode (add or replace)
+           - Click "Import Data"
+
+        **Supported columns:** Board, Project, Item, Name, Status, Owner, Person, Description, Notes, Due Date
+
+        **Status mapping:**
+        - Backlog/Todo → Seed
+        - Research/Stuck → Validation
+        - In Progress/Doing → MVP
+        - Testing → Pilot
+        - Production → Scale
+        - Done/Completed → Exit
+        """)
 
 
 def ai_insights_panel(db: Database):

@@ -192,6 +192,50 @@ Access via **"⚙️ Admin Panel"** button in sidebar.
 2. Add: `OPENAI_API_KEY=your_key_here`
 3. Restart the app
 
+### 📥 Import Data
+
+**Import from Monday.com:**
+Upload CSV or Excel exports from Monday.com to quickly populate your dashboard.
+
+**How to Import:**
+1. Export your Monday.com board (Menu → Export → CSV/Excel)
+2. Go to Admin Panel → Import Data tab
+3. Upload the file
+4. Review the preview
+5. Choose import mode:
+   - **Add to existing** - Keeps current data and adds new
+   - **Replace all** - Deletes existing ideas and imports fresh
+6. Click "Import Data"
+
+**What Gets Imported:**
+- Projects → Ideas in Studio Cockpit
+- Tasks → Milestones for each idea
+- Owners → Assigned to ideas
+- Status → Mapped to pipeline stages
+- Descriptions → Project details
+
+**Status Mapping:**
+- Backlog/Todo → Seed
+- Research/Stuck → Validation
+- In Progress/Doing → MVP
+- Testing → Pilot
+- Production → Scale
+- Done/Completed → Exit
+
+**Supported Columns:**
+- Board, Project (groups items into ideas)
+- Item, Name, Task (idea/milestone names)
+- Status, Stage (pipeline stage)
+- Owner, Person, Assigned To (ownership)
+- Description, Notes, Summary (details)
+- Due Date, Deadline (milestone dates)
+
+**Tips:**
+- Download the sample CSV to see the expected format
+- Column names are case-insensitive
+- Unknown statuses default to "Seed"
+- Always export your current data before replacing
+
 ### 🗂️ Data Management
 
 **Bulk Operations:**

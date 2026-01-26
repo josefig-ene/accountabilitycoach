@@ -2,6 +2,7 @@ streamlit==1.31.0
 pandas==2.1.4
 plotly==5.18.0
 python-dotenv==1.0.0
+openpyxl==3.1.2
 
 # Optional: For Turso cloud database (requires Rust/Cargo to compile)
 # Uncomment if using Turso: libsql-experimental==0.0.55
