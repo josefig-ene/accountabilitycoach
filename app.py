@@ -973,6 +973,10 @@ def help_page():
 def main():
     """Main application"""
 
+    # Initialize session state for navigation
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 'studio'
+
     # Sidebar navigation
     st.sidebar.markdown("<h1 style='text-align: center;'>🎯 CEO Dashboard</h1>", unsafe_allow_html=True)
     st.sidebar.markdown("<p style='text-align: center; color: #a8b3cf;'>Command Center</p>", unsafe_allow_html=True)
@@ -986,6 +990,14 @@ def main():
         label_visibility="collapsed"
     )
 
+    # Update session state based on radio selection
+    if page == "🚀 Studio Cockpit":
+        st.session_state.current_page = 'studio'
+    elif page == "💼 Cohort Lab":
+        st.session_state.current_page = 'cohort'
+    elif page == "🌿 Sustainability":
+        st.session_state.current_page = 'sustainability'
+
     st.sidebar.markdown("---")
     st.sidebar.markdown('<span class="engine-label wealth">WEALTH</span>', unsafe_allow_html=True)
     st.sidebar.markdown('<span class="engine-label cashflow">CASHFLOW</span>', unsafe_allow_html=True)
@@ -995,13 +1007,15 @@ def main():
 
     # Admin section
     st.sidebar.markdown("### ADMIN")
-    admin_page = st.sidebar.button("⚙️ Admin Panel", use_container_width=True)
+    if st.sidebar.button("⚙️ Admin Panel", use_container_width=True):
+        st.session_state.current_page = 'admin'
 
     st.sidebar.markdown("---")
 
     # Help section
     st.sidebar.markdown("### HELP")
-    help_page_button = st.sidebar.button("📖 User Guide", use_container_width=True)
+    if st.sidebar.button("📖 User Guide", use_container_width=True):
+        st.session_state.current_page = 'help'
 
     with st.sidebar.expander("💡 Quick Tips"):
         st.markdown("""
@@ -1036,16 +1050,16 @@ def main():
 
     st.sidebar.caption("Built with Streamlit & Turso")
 
-    # Route to appropriate page
-    if help_page_button:
+    # Route to appropriate page based on session state
+    if st.session_state.current_page == 'help':
         help_page()
-    elif admin_page:
+    elif st.session_state.current_page == 'admin':
         admin_panel(db)
-    elif page == "🚀 Studio Cockpit":
+    elif st.session_state.current_page == 'studio':
         studio_cockpit()
-    elif page == "💼 Cohort Lab":
+    elif st.session_state.current_page == 'cohort':
         cohort_lab()
-    elif page == "🌿 Sustainability":
+    elif st.session_state.current_page == 'sustainability':
         sustainability_dashboard()
 
 

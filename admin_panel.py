@@ -312,11 +312,16 @@ def import_data_panel(db: Database):
 
                             - Imported {imported_count} ideas
                             - Created {milestone_count} milestones
-
-                            Go to Studio Cockpit to view your imported projects!
                             """)
 
                             st.balloons()
+
+                            # Add button to navigate to Studio Cockpit
+                            col1, col2, col3 = st.columns([1, 1, 1])
+                            with col2:
+                                if st.button("🚀 View in Studio Cockpit", type="primary", use_container_width=True):
+                                    st.session_state.current_page = 'studio'
+                                    st.rerun()
 
                         except Exception as e:
                             st.error(f"❌ Error during import: {str(e)}")
