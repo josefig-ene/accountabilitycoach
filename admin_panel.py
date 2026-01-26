@@ -151,16 +151,16 @@ def import_data_panel(db: Database):
 
     with col2:
         st.markdown("### 📄 Sample Format")
-        if st.button("Download Sample CSV", use_container_width=True):
-            from monday_import import create_sample_monday_csv
-            sample_csv = create_sample_monday_csv()
-            st.download_button(
-                label="⬇️ Get Sample File",
-                data=sample_csv,
-                file_name="monday_sample.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+        from monday_import import create_sample_monday_csv
+        sample_csv = create_sample_monday_csv()
+        st.download_button(
+            label="📥 Download Sample CSV",
+            data=sample_csv,
+            file_name="monday_sample.csv",
+            mime="text/csv",
+            use_container_width=True,
+            help="Download a sample CSV to see the expected format"
+        )
 
     if uploaded_file is not None:
         st.success(f"✅ File uploaded: {uploaded_file.name}")
@@ -231,7 +231,9 @@ def import_data_panel(db: Database):
                             with col1:
                                 st.write(f"**Owner:** {idea['owner']}")
                                 st.write(f"**Stage:** {idea['stage']}")
-                                st.write(f"**Description:** {idea['description'][:100]}...")
+                                desc = idea.get('description', '')
+                                desc_preview = desc[:100] + "..." if len(desc) > 100 else desc
+                                st.write(f"**Description:** {desc_preview}")
                             with col2:
                                 milestones = idea.get('milestones', [])
                                 st.write(f"**Milestones:** {len(milestones)}")
@@ -278,42 +280,47 @@ def import_data_panel(db: Database):
                         imported_count = 0
                         milestone_count = 0
 
-                        for idea_data in ideas:
-                            # Extract milestones
-                            milestones = idea_data.pop('milestones', [])
+                        try:
+                            for idea_data in ideas:
+                                # Get milestones (don't pop to avoid modifying original)
+                                milestones = idea_data.get('milestones', [])
 
-                            # Add idea
-                            idea_id = db.add_idea(
-                                name=idea_data['name'],
-                                description=idea_data['description'],
-                                stage=idea_data['stage'],
-                                owner=idea_data['owner'],
-                                next_steps=idea_data.get('next_steps', ''),
-                                risk_flags=idea_data.get('risk_flags', '')
-                            )
-
-                            imported_count += 1
-
-                            # Add milestones
-                            for milestone in milestones:
-                                db.add_milestone(
-                                    idea_id=idea_id,
-                                    milestone_name=milestone['name'],
-                                    status=milestone['status'],
-                                    weight=milestone['weight']
+                                # Add idea
+                                idea_id = db.add_idea(
+                                    name=idea_data['name'],
+                                    description=idea_data['description'],
+                                    stage=idea_data['stage'],
+                                    owner=idea_data['owner'],
+                                    next_steps=idea_data.get('next_steps', ''),
+                                    risk_flags=idea_data.get('risk_flags', '')
                                 )
-                                milestone_count += 1
 
-                        st.success(f"""
-                        ✅ **Import Complete!**
+                                imported_count += 1
 
-                        - Imported {imported_count} ideas
-                        - Created {milestone_count} milestones
+                                # Add milestones
+                                for milestone in milestones:
+                                    db.add_milestone(
+                                        idea_id=idea_id,
+                                        milestone_name=milestone['name'],
+                                        status=milestone['status'],
+                                        weight=milestone['weight']
+                                    )
+                                    milestone_count += 1
 
-                        Go to Studio Cockpit to view your imported projects!
-                        """)
+                            st.success(f"""
+                            ✅ **Import Complete!**
 
-                        st.balloons()
+                            - Imported {imported_count} ideas
+                            - Created {milestone_count} milestones
+
+                            Go to Studio Cockpit to view your imported projects!
+                            """)
+
+                            st.balloons()
+
+                        except Exception as e:
+                            st.error(f"❌ Error during import: {str(e)}")
+                            st.info("Some data may have been partially imported. Check Studio Cockpit.")
 
                 else:
                     st.warning("No data could be imported. Please check the file format.")
@@ -324,6 +331,11 @@ def import_data_panel(db: Database):
         except Exception as e:
             st.error(f"❌ Error processing file: {str(e)}")
             st.info("💡 Make sure your file is a valid Monday.com export in CSV or Excel format.")
+
+            # Show detailed error in expander for debugging
+            with st.expander("🔍 Technical Details (for debugging)"):
+                import traceback
+                st.code(traceback.format_exc())
 
     else:
         # Show instructions when no file uploaded
