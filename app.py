@@ -25,28 +25,29 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Clean, readable theme
+# Soothing, warm theme with calming colors
 st.markdown("""
     <style>
-    /* Main background - lighter, easier on eyes */
+    /* Main background - soft, warm, soothing */
     .stApp {
-        background-color: #1e2433;
+        background: linear-gradient(135deg, #f5f3f0 0%, #e8e6e3 100%);
     }
 
     .main {
-        background-color: #1e2433;
-        color: #ffffff;
+        background: transparent;
+        color: #2c3e50;
         padding: 1rem 2rem;
     }
 
-    /* Sidebar */
+    /* Sidebar - warm, inviting */
     [data-testid="stSidebar"] {
-        background-color: #252b3b;
+        background: linear-gradient(180deg, #f8f6f4 0%, #ede9e5 100%);
+        border-right: 1px solid #d4cfc8;
     }
 
-    /* Headers - clean and readable */
+    /* Headers - professional but warm */
     h1, h2, h3 {
-        color: #ffffff !important;
+        color: #2c3e50 !important;
         font-weight: 600 !important;
     }
 
@@ -55,74 +56,90 @@ st.markdown("""
     }
 
     .subtitle {
-        color: #b8c5db;
+        color: #5a6c7d;
         font-size: 1rem;
         margin-bottom: 2rem;
     }
 
-    /* Buttons - simple and clear */
+    /* Buttons - soft, calming accent */
     .stButton>button {
-        background-color: #4c6ef5;
+        background-color: #6b9bd1;
         color: white;
         border: none;
-        border-radius: 6px;
-        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        padding: 0.6rem 1.2rem;
         font-weight: 500;
-        transition: background-color 0.2s;
+        transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
     .stButton>button:hover {
-        background-color: #5c7cfa;
+        background-color: #5a8bc4;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        transform: translateY(-1px);
     }
 
-    /* Metrics - clean boxes */
+    /* Metrics - clean, light boxes */
     div[data-testid="stMetric"] {
-        background-color: #2d3548;
+        background-color: white;
         padding: 1.2rem;
-        border-radius: 8px;
-        border: 1px solid #3d4564;
+        border-radius: 12px;
+        border: 1px solid #e0dbd5;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
 
     div[data-testid="stMetricValue"] {
         font-size: 2rem;
-        color: #ffffff;
+        color: #2c3e50;
         font-weight: 600;
     }
 
     div[data-testid="stMetricLabel"] {
-        color: #b8c5db;
+        color: #5a6c7d;
         font-size: 0.9rem;
     }
 
-    /* Tabs - clean and simple */
+    /* Tabs - soft and inviting */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #2d3548;
-        border-radius: 8px;
-        padding: 0.25rem;
+        background-color: #f8f6f4;
+        border-radius: 10px;
+        padding: 0.3rem;
         gap: 0.25rem;
+        border: 1px solid #e0dbd5;
     }
 
     .stTabs [data-baseweb="tab"] {
-        color: #b8c5db;
+        color: #5a6c7d;
         background-color: transparent;
-        border-radius: 6px;
-        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        padding: 0.6rem 1.2rem;
+        font-weight: 500;
     }
 
     .stTabs [aria-selected="true"] {
-        background-color: #4c6ef5;
+        background-color: #6b9bd1;
         color: white !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    /* Forms - clear and visible */
+    /* Forms - clean and readable */
     .stTextInput input,
     .stTextArea textarea,
     .stSelectbox select,
-    .stNumberInput input {
-        background-color: #2d3548 !important;
-        color: #ffffff !important;
-        border: 1px solid #3d4564 !important;
-        border-radius: 6px !important;
+    .stNumberInput input,
+    .stDateInput input {
+        background-color: white !important;
+        color: #2c3e50 !important;
+        border: 2px solid #e0dbd5 !important;
+        border-radius: 8px !important;
+    }
+
+    .stTextInput input:focus,
+    .stTextArea textarea:focus,
+    .stSelectbox select:focus,
+    .stNumberInput input:focus {
+        border-color: #6b9bd1 !important;
+        box-shadow: 0 0 0 3px rgba(107, 155, 209, 0.1) !important;
     }
 
     .stTextInput label,
@@ -130,7 +147,7 @@ st.markdown("""
     .stSelectbox label,
     .stNumberInput label,
     .stDateInput label {
-        color: #ffffff !important;
+        color: #2c3e50 !important;
         font-weight: 500 !important;
         margin-bottom: 0.5rem !important;
     }
@@ -138,26 +155,52 @@ st.markdown("""
     /* Radio and checkbox */
     .stRadio label,
     .stCheckbox label {
-        color: #ffffff !important;
+        color: #2c3e50 !important;
     }
 
-    /* Info boxes */
+    /* Info boxes - soft colors */
     .stAlert {
-        background-color: #2d3548;
-        border: 1px solid #3d4564;
-        color: #ffffff;
-        border-radius: 6px;
+        background-color: #f8f9fa;
+        border: 1px solid #e0dbd5;
+        color: #2c3e50;
+        border-radius: 8px;
     }
 
-    /* Dataframes */
+    /* Dataframes - clean white */
     .dataframe {
-        background-color: #2d3548 !important;
-        color: #ffffff !important;
+        background-color: white !important;
+        color: #2c3e50 !important;
     }
 
-    /* Simplify everything else */
-    p, span, div {
-        color: #ffffff;
+    /* General text */
+    p, span, div, label {
+        color: #2c3e50;
+    }
+
+    /* Expander */
+    .streamlit-expanderHeader {
+        background-color: #f8f6f4;
+        border-radius: 8px;
+        color: #2c3e50 !important;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #f8f6f4;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #c4bcb3;
+        border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #a8a199;
     }
 
     </style>
@@ -256,12 +299,12 @@ def studio_cockpit():
             }
 
             stage_colors = {
-                'seed': '#8b4513',
-                'validation': '#4a5568',
-                'mvp': '#5a67d8',
-                'pilot': '#2c7a7b',
-                'scale': '#3182ce',
-                'exit': '#742a2a'
+                'seed': '#d4a574',
+                'validation': '#7e9bb5',
+                'mvp': '#6b9bd1',
+                'pilot': '#81b29a',
+                'scale': '#5a9fb7',
+                'exit': '#a67d88'
             }
 
             # Build HTML for horizontal scrollable Kanban board
@@ -270,19 +313,22 @@ def studio_cockpit():
                 .kanban-board-container {
                     display: flex;
                     overflow-x: auto;
-                    gap: 1rem;
-                    padding: 1rem 0;
+                    gap: 1.25rem;
+                    padding: 1.5rem 0;
                 }
                 .kanban-board-container::-webkit-scrollbar {
                     height: 10px;
                 }
                 .kanban-board-container::-webkit-scrollbar-track {
-                    background: #2d3548;
-                    border-radius: 4px;
+                    background: #f8f6f4;
+                    border-radius: 5px;
                 }
                 .kanban-board-container::-webkit-scrollbar-thumb {
-                    background: #4c6ef5;
-                    border-radius: 4px;
+                    background: #c4bcb3;
+                    border-radius: 5px;
+                }
+                .kanban-board-container::-webkit-scrollbar-thumb:hover {
+                    background: #a8a199;
                 }
                 .kb-column-wrap {
                     min-width: 300px;
@@ -296,31 +342,32 @@ def studio_cockpit():
                     margin-bottom: 1rem;
                     padding-bottom: 0.75rem;
                     border-bottom: 3px solid;
-                    color: #ffffff;
+                    color: #2c3e50;
                 }
                 .kb-column {
-                    background-color: #2d3548;
-                    padding: 1rem;
-                    border-radius: 8px;
-                    border: 1px solid #3d4564;
+                    background-color: #f8f6f4;
+                    padding: 1.25rem;
+                    border-radius: 12px;
+                    border: 1px solid #e0dbd5;
                     min-height: 500px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
                 }
                 .kb-card {
                     padding: 1.25rem;
-                    border-radius: 6px;
-                    background-color: #3d4564;
+                    border-radius: 10px;
+                    background-color: white;
                     margin: 0.75rem 0;
                     border-left: 4px solid;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
                     transition: all 0.2s;
                 }
                 .kb-card:hover {
                     transform: translateY(-2px);
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
                 }
                 .kb-empty {
                     text-align: center;
-                    color: #8892a6;
+                    color: #8e9aaf;
                     padding: 2rem;
                     font-size: 0.9rem;
                 }
@@ -345,11 +392,11 @@ def studio_cockpit():
 
                         kanban_html += f'''
                         <div class="kb-card" style="border-left-color: {stage_colors[stage]};">
-                            <div style="font-weight: 600; margin-bottom: 0.75rem; color: #ffffff; font-size: 1rem;">{name}{risk_badge}</div>
-                            <div style="font-size: 0.9rem; color: #b8c5db; margin-bottom: 0.5rem;">
+                            <div style="font-weight: 600; margin-bottom: 0.75rem; color: #2c3e50; font-size: 1rem;">{name}{risk_badge}</div>
+                            <div style="font-size: 0.9rem; color: #5a6c7d; margin-bottom: 0.5rem;">
                                 {confidence_color} {idea['confidence_score']}% confidence
                             </div>
-                            <div style="font-size: 0.85rem; color: #b8c5db;">
+                            <div style="font-size: 0.85rem; color: #5a6c7d;">
                                 👤 {owner}
                             </div>
                         </div>

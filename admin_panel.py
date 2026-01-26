@@ -13,28 +13,28 @@ import json
 def admin_panel(db: Database):
     """Admin Panel with CRUD and settings"""
 
-    # Clean admin panel styling
+    # Admin panel matches soothing theme
     st.markdown("""
         <style>
-        /* Admin panel - clean and readable */
+        /* Admin panel - matches main theme */
         .stMarkdown, .stMarkdown p, .stMarkdown li {
-            color: #ffffff !important;
+            color: #2c3e50 !important;
         }
 
         /* All labels */
         label {
-            color: #ffffff !important;
+            color: #2c3e50 !important;
             font-weight: 500 !important;
         }
 
         /* Headings */
         h1, h2, h3, h4 {
-            color: #ffffff !important;
+            color: #2c3e50 !important;
         }
 
         /* Caption text */
         .stCaption {
-            color: #b8c5db !important;
+            color: #5a6c7d !important;
         }
         </style>
     """, unsafe_allow_html=True)
