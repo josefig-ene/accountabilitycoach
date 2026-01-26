@@ -956,7 +956,7 @@ def help_page():
     st.markdown('<p class="subtitle">Complete guide to using the CEO Dashboard</p>', unsafe_allow_html=True)
 
     try:
-        with open("USER_GUIDE.md", "r") as f:
+        with open("USER_GUIDE.md", "r", encoding="utf-8") as f:
             guide_content = f.read()
 
         # Display the markdown content
@@ -965,6 +965,9 @@ def help_page():
     except FileNotFoundError:
         st.error("USER_GUIDE.md not found. Please ensure the file exists in the project directory.")
         st.info("You can find the user guide at: https://github.com/your-repo/USER_GUIDE.md")
+    except UnicodeDecodeError:
+        st.error("Error reading USER_GUIDE.md. The file may contain invalid characters.")
+        st.info("Try re-downloading the file or check the file encoding.")
 
 
 def main():
