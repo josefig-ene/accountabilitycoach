@@ -21,6 +21,7 @@ class MondayImporter:
         'description': ['Description', 'description', 'Notes', 'notes', 'Summary', 'summary', 'Text', 'text'],
         'priority': ['Priority', 'priority'],
         'due_date': ['Due Date', 'due_date', 'Deadline', 'deadline', 'Date', 'date', 'Timeline', 'timeline'],
+        'milestone': ['Milestone', 'milestone', 'Milestones', 'milestones'],
     }
 
     # Status mapping from Monday.com to dashboard stages
@@ -157,6 +158,17 @@ class MondayImporter:
                     'risk_flags': '',
                 }
 
+                # Check if this row has a milestone value in a Milestone column
+                milestone_value = self._get_value(row, columns, 'milestone', None)
+                if milestone_value and str(milestone_value).strip():
+                    milestone = {
+                        'name': str(milestone_value).strip(),
+                        'status': 'pending',  # Default status for column-based milestones
+                        'weight': 10
+                    }
+                    current_subitems.append(milestone)
+                    self.warnings.append(f"✓ Added milestone from column: '{milestone['name']}' to idea '{current_idea['name']}'")
+
             else:
                 # We're in subitems section
                 # FIRST check if this row is a new main item (has data in the ORIGINAL main name column)
@@ -183,6 +195,17 @@ class MondayImporter:
                         'next_steps': '',
                         'risk_flags': '',
                     }
+
+                    # Check if this row has a milestone value in a Milestone column
+                    milestone_value = self._get_value(row, columns, 'milestone', None)
+                    if milestone_value and str(milestone_value).strip():
+                        milestone = {
+                            'name': str(milestone_value).strip(),
+                            'status': 'pending',
+                            'weight': 10
+                        }
+                        current_subitems.append(milestone)
+                        self.warnings.append(f"✓ Added milestone from column: '{milestone['name']}' to idea '{current_idea['name']}'")
                 else:
                     # Not a main item - try to parse as subitem
                     subitem_name = None
