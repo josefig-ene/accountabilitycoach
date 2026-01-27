@@ -372,8 +372,6 @@ def import_data_panel(db: Database):
                             - Created {milestone_count} milestones
                             """)
 
-                            st.balloons()
-
                             # Add button to navigate to Studio Cockpit
                             col1, col2, col3 = st.columns([1, 1, 1])
                             with col2:

@@ -52,7 +52,7 @@ class Database:
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT,
-                stage TEXT NOT NULL CHECK(stage IN ('seed', 'validation', 'mvp', 'pilot', 'scale', 'exit')),
+                stage TEXT NOT NULL CHECK(stage IN ('goals', 'planning', 'seed', 'validation', 'mvp', 'pilot', 'scale', 'exit')),
                 owner TEXT,
                 confidence_score INTEGER DEFAULT 0,
                 next_steps TEXT,
@@ -72,6 +72,45 @@ class Database:
             cursor.execute("ALTER TABLE ideas ADD COLUMN risk_flags TEXT")
         except sqlite3.OperationalError:
             pass  # Column already exists
+
+        # Migrate stage CHECK constraint to include 'goals' and 'planning'
+        try:
+            # Check if we need to migrate (test if 'goals' stage would be rejected)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ideas'")
+            if cursor.fetchone():
+                # Create new table with updated constraint
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS ideas_new (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        stage TEXT NOT NULL CHECK(stage IN ('goals', 'planning', 'seed', 'validation', 'mvp', 'pilot', 'scale', 'exit')),
+                        owner TEXT,
+                        confidence_score INTEGER DEFAULT 0,
+                        next_steps TEXT,
+                        risk_flags TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
+                # Check if old table has data
+                cursor.execute("SELECT COUNT(*) FROM ideas")
+                count = cursor.fetchone()[0]
+
+                if count > 0:
+                    # Copy data from old table to new table
+                    cursor.execute("""
+                        INSERT INTO ideas_new (id, name, description, stage, owner, confidence_score, next_steps, risk_flags, created_at, updated_at)
+                        SELECT id, name, description, stage, owner, confidence_score, next_steps, risk_flags, created_at, updated_at
+                        FROM ideas
+                    """)
+
+                # Drop old table and rename new one
+                cursor.execute("DROP TABLE ideas")
+                cursor.execute("ALTER TABLE ideas_new RENAME TO ideas")
+        except sqlite3.OperationalError:
+            pass  # Migration already done or not needed
 
         # Milestones table
         cursor.execute("""

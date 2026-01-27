@@ -288,8 +288,10 @@ def studio_cockpit():
         if not ideas:
             st.info("No ideas yet. Add your first idea in the 'Add New Idea' tab!")
         else:
-            stages = ['seed', 'validation', 'mvp', 'pilot', 'scale', 'exit']
+            stages = ['goals', 'planning', 'seed', 'validation', 'mvp', 'pilot', 'scale', 'exit']
             stage_labels = {
+                'goals': '🎯 Goals',
+                'planning': '📝 Planning',
                 'seed': '🌱 Seed',
                 'validation': '🔍 Validation',
                 'mvp': '⚙️ MVP',
@@ -299,6 +301,8 @@ def studio_cockpit():
             }
 
             stage_colors = {
+                'goals': '#b8a89f',
+                'planning': '#c4b5a8',
                 'seed': '#d4a574',
                 'validation': '#7e9bb5',
                 'mvp': '#6b9bd1',
@@ -512,7 +516,7 @@ def studio_cockpit():
 
             col1, col2 = st.columns(2)
             with col1:
-                stage = st.selectbox("Stage *", ['seed', 'validation', 'mvp', 'pilot', 'scale', 'exit'])
+                stage = st.selectbox("Stage *", ['goals', 'planning', 'seed', 'validation', 'mvp', 'pilot', 'scale', 'exit'])
             with col2:
                 owner = st.text_input("Owner *", placeholder="e.g., John Doe")
 
