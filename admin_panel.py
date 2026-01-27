@@ -203,6 +203,24 @@ def import_data_panel(db: Database):
             if df is not None and not df.empty:
                 st.success(f"✅ Parsed {len(df)} rows from file")
 
+                # Show columns detected
+                columns_list = df.columns.tolist()
+                st.info(f"**📋 Columns found:** {', '.join(columns_list)}")
+
+                # Show what we're looking for
+                with st.expander("ℹ️ What columns we expect"):
+                    st.markdown("""
+                    We look for these column names (case-insensitive):
+                    - **Name/Item:** Name, Item, Task, name, item, task
+                    - **Board/Project:** Board, Project, board, project
+                    - **Status:** Status, status, Stage, stage
+                    - **Owner:** Owner, Person, owner, person, Assigned To
+                    - **Description:** Description, Notes, Summary
+                    - **Due Date:** Due Date, Deadline, Date
+
+                    At minimum, we need a **Name** or **Item** column.
+                    """)
+
                 # Show preview of data
                 with st.expander("📋 View Raw Data Preview"):
                     st.dataframe(df.head(10), use_container_width=True)

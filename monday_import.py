@@ -14,13 +14,13 @@ class MondayImporter:
 
     # Common Monday.com column mappings
     COLUMN_MAPPINGS = {
-        'project': ['Board', 'Project', 'board', 'project'],
-        'name': ['Name', 'Item', 'Task', 'name', 'item', 'task'],
-        'status': ['Status', 'status', 'Stage', 'stage'],
-        'owner': ['Owner', 'Person', 'owner', 'person', 'assigned_to', 'Assigned To'],
-        'description': ['Description', 'description', 'Notes', 'notes', 'Summary', 'summary'],
+        'project': ['Board', 'Project', 'board', 'project', 'Group', 'group'],
+        'name': ['Name', 'Item', 'Task', 'name', 'item', 'task', 'Title', 'title', 'Item Name', 'item name'],
+        'status': ['Status', 'status', 'Stage', 'stage', 'State', 'state'],
+        'owner': ['Owner', 'Person', 'owner', 'person', 'assigned_to', 'Assigned To', 'People', 'people'],
+        'description': ['Description', 'description', 'Notes', 'notes', 'Summary', 'summary', 'Text', 'text'],
         'priority': ['Priority', 'priority'],
-        'due_date': ['Due Date', 'due_date', 'Deadline', 'deadline', 'Date', 'date'],
+        'due_date': ['Due Date', 'due_date', 'Deadline', 'deadline', 'Date', 'date', 'Timeline', 'timeline'],
     }
 
     # Status mapping from Monday.com to dashboard stages
@@ -65,6 +65,12 @@ class MondayImporter:
                 if col.strip() in possible_names:
                     detected[field] = col
                     break
+
+        # Fallback: if no name column found, use the first column
+        if 'name' not in detected and len(df.columns) > 0:
+            first_col = df.columns[0]
+            detected['name'] = first_col
+            self.warnings.append(f"No standard name column found. Using '{first_col}' as name column.")
 
         return detected
 
@@ -196,7 +202,7 @@ class MondayImporter:
         columns = self.detect_columns(df)
 
         if 'name' not in columns:
-            self.errors.append("Could not find name/item column in the file")
+            self.errors.append(f"Could not find name/item column in the file. Available columns: {', '.join(df.columns.tolist())}")
             return [], self.errors, self.warnings
 
         # Extract ideas
