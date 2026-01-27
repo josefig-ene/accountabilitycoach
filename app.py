@@ -990,13 +990,15 @@ def main():
         label_visibility="collapsed"
     )
 
-    # Update session state based on radio selection
-    if page == "🚀 Studio Cockpit":
-        st.session_state.current_page = 'studio'
-    elif page == "💼 Cohort Lab":
-        st.session_state.current_page = 'cohort'
-    elif page == "🌿 Sustainability":
-        st.session_state.current_page = 'sustainability'
+    # Only update session state if NOT in admin or help mode
+    # This prevents radio button from overriding admin/help navigation
+    if st.session_state.current_page not in ['admin', 'help']:
+        if page == "🚀 Studio Cockpit":
+            st.session_state.current_page = 'studio'
+        elif page == "💼 Cohort Lab":
+            st.session_state.current_page = 'cohort'
+        elif page == "🌿 Sustainability":
+            st.session_state.current_page = 'sustainability'
 
     st.sidebar.markdown("---")
     st.sidebar.markdown('<span class="engine-label wealth">WEALTH</span>', unsafe_allow_html=True)
@@ -1009,6 +1011,7 @@ def main():
     st.sidebar.markdown("### ADMIN")
     if st.sidebar.button("⚙️ Admin Panel", use_container_width=True):
         st.session_state.current_page = 'admin'
+        st.rerun()
 
     st.sidebar.markdown("---")
 
@@ -1016,6 +1019,7 @@ def main():
     st.sidebar.markdown("### HELP")
     if st.sidebar.button("📖 User Guide", use_container_width=True):
         st.session_state.current_page = 'help'
+        st.rerun()
 
     with st.sidebar.expander("💡 Quick Tips"):
         st.markdown("""
