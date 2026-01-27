@@ -314,28 +314,38 @@ def studio_cockpit():
             # Build HTML for horizontal scrollable Kanban board
             kanban_html = """
             <style>
+                .kanban-board-wrapper {
+                    width: 100%;
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                    margin: 0 -1rem;
+                    padding: 0 1rem;
+                }
                 .kanban-board-container {
                     display: flex;
-                    overflow-x: auto;
                     gap: 1.25rem;
                     padding: 1.5rem 0;
+                    width: max-content;
+                    min-width: 100%;
                 }
-                .kanban-board-container::-webkit-scrollbar {
-                    height: 10px;
+                .kanban-board-wrapper::-webkit-scrollbar {
+                    height: 12px;
                 }
-                .kanban-board-container::-webkit-scrollbar-track {
+                .kanban-board-wrapper::-webkit-scrollbar-track {
                     background: #f8f6f4;
-                    border-radius: 5px;
+                    border-radius: 6px;
+                    margin: 0 1rem;
                 }
-                .kanban-board-container::-webkit-scrollbar-thumb {
+                .kanban-board-wrapper::-webkit-scrollbar-thumb {
                     background: #c4bcb3;
-                    border-radius: 5px;
+                    border-radius: 6px;
                 }
-                .kanban-board-container::-webkit-scrollbar-thumb:hover {
+                .kanban-board-wrapper::-webkit-scrollbar-thumb:hover {
                     background: #a8a199;
                 }
                 .kb-column-wrap {
                     min-width: 300px;
+                    max-width: 300px;
                     flex-shrink: 0;
                 }
                 .kb-header {
@@ -376,7 +386,8 @@ def studio_cockpit():
                     font-size: 0.9rem;
                 }
             </style>
-            <div class="kanban-board-container">
+            <div class="kanban-board-wrapper">
+                <div class="kanban-board-container">
             """
 
             for stage in stages:
@@ -410,7 +421,7 @@ def studio_cockpit():
 
                 kanban_html += '</div></div>'
 
-            kanban_html += '</div>'
+            kanban_html += '</div></div>'  # Close kanban-board-container and kanban-board-wrapper
 
             components.html(kanban_html, height=600, scrolling=False)
 
