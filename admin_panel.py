@@ -41,8 +41,16 @@ def admin_panel(db: Database):
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="admin-panel">', unsafe_allow_html=True)
-    st.markdown("<h1>⚙️ Admin Panel</h1>", unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">System Administration & Settings</p>', unsafe_allow_html=True)
+
+    # Add back button at the top
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        st.markdown("<h1>⚙️ Admin Panel</h1>", unsafe_allow_html=True)
+        st.markdown('<p class="subtitle">System Administration & Settings</p>', unsafe_allow_html=True)
+    with col2:
+        if st.button("← Back", key="exit_admin", help="Return to Studio Cockpit"):
+            st.session_state.current_page = 'studio'
+            st.rerun()
 
     # Tabs for different admin functions
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -350,8 +358,10 @@ def import_data_panel(db: Database):
                                     db.add_milestone(
                                         idea_id=idea_id,
                                         milestone_name=milestone['name'],
+                                        category='business',  # Default category for imported milestones
                                         status=milestone['status'],
-                                        weight=milestone['weight']
+                                        weight=milestone['weight'],
+                                        notes='Imported from Monday.com'
                                     )
                                     milestone_count += 1
 
