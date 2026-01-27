@@ -267,11 +267,13 @@ class MondayImporter:
         # Extract ideas
         ideas = self.extract_ideas(df, columns)
 
-        # Extract milestones for each idea that has tasks
+        # Convert tasks to milestones
+        # Note: extract_ideas already creates tasks in milestone format for nested subitems
         for idea in ideas:
             if 'tasks' in idea and idea['tasks']:
-                idea['milestones'] = self.extract_milestones(idea['tasks'], columns)
-                del idea['tasks']  # Remove temporary tasks field
+                # Tasks from nested subitems are already in milestone format
+                idea['milestones'] = idea['tasks']
+                del idea['tasks']
             else:
                 idea['milestones'] = []
 
