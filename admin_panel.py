@@ -146,7 +146,8 @@ def import_data_panel(db: Database):
         uploaded_file = st.file_uploader(
             "Upload Monday.com Export (CSV or Excel)",
             type=['csv', 'xlsx', 'xls'],
-            help="Export your Monday.com board as CSV or Excel and upload it here"
+            help="Export your Monday.com board as CSV or Excel and upload it here",
+            key="monday_file_uploader"
         )
 
     with col2:
@@ -162,12 +163,27 @@ def import_data_panel(db: Database):
             help="Download a sample CSV to see the expected format"
         )
 
+    # Debug info
+    if uploaded_file is None:
+        st.info("👆 Upload a CSV or Excel file to begin importing")
+
     if uploaded_file is not None:
         st.success(f"✅ File uploaded: {uploaded_file.name}")
+
+        # Check for Excel support
+        file_ext = uploaded_file.name.split('.')[-1].lower()
+        if file_ext in ['xlsx', 'xls']:
+            try:
+                import openpyxl
+                st.info(f"📊 Detected Excel file - using openpyxl to parse")
+            except ImportError:
+                st.error("❌ Excel support not installed. Install with: `pip install openpyxl`")
+                st.stop()
 
         try:
             # Initialize importer
             importer = MondayImporter()
+            st.info("🔧 Initialized Monday.com importer")
 
             # Determine file type
             file_type = uploaded_file.name.split('.')[-1].lower()
@@ -177,6 +193,8 @@ def import_data_panel(db: Database):
                 file_type = 'xls'
             else:
                 file_type = 'csv'
+
+            st.info(f"📄 Parsing {file_type.upper()} file...")
 
             # Parse file
             file_content = uploaded_file.read()
