@@ -363,8 +363,24 @@ def studio_cockpit():
                     padding: 1.25rem;
                     border-radius: 12px;
                     border: 1px solid #e0dbd5;
-                    min-height: 500px;
+                    min-height: 400px;
+                    max-height: 500px;
+                    overflow-y: auto;
                     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                }
+                .kb-column::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .kb-column::-webkit-scrollbar-track {
+                    background: #e8e6e3;
+                    border-radius: 4px;
+                }
+                .kb-column::-webkit-scrollbar-thumb {
+                    background: #c4bcb3;
+                    border-radius: 4px;
+                }
+                .kb-column::-webkit-scrollbar-thumb:hover {
+                    background: #a8a199;
                 }
                 .kb-card {
                     padding: 1.25rem;
