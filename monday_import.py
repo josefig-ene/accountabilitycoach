@@ -163,7 +163,7 @@ class MondayImporter:
                 if milestone_value and str(milestone_value).strip():
                     milestone = {
                         'name': str(milestone_value).strip(),
-                        'status': 'pending',  # Default status for column-based milestones
+                        'status': 'not_started',  # Default status for column-based milestones
                         'weight': 10
                     }
                     current_subitems.append(milestone)
@@ -201,7 +201,7 @@ class MondayImporter:
                     if milestone_value and str(milestone_value).strip():
                         milestone = {
                             'name': str(milestone_value).strip(),
-                            'status': 'pending',
+                            'status': 'not_started',
                             'weight': 10
                         }
                         current_subitems.append(milestone)
@@ -268,20 +268,20 @@ class MondayImporter:
         return ideas
 
     def _map_subitem_status(self, status):
-        """Map subitem status to milestone status"""
+        """Map subitem status to milestone status (database expects: not_started, in_progress, done)"""
         if not status:
-            return 'pending'
+            return 'not_started'
 
         status_lower = str(status).lower().strip()
 
         if 'done' in status_lower or 'complete' in status_lower:
-            return 'completed'
+            return 'done'
         elif 'working' in status_lower or 'progress' in status_lower:
             return 'in_progress'
         elif 'stuck' in status_lower or 'blocked' in status_lower:
             return 'in_progress'  # Mark as in progress but could add flag
         else:
-            return 'pending'
+            return 'not_started'
 
     def extract_milestones(self, tasks: List[Dict], columns: Dict[str, str]) -> List[Dict]:
         """Extract milestones from project tasks"""
@@ -293,11 +293,11 @@ class MondayImporter:
             if pd.isna(name) or str(name).strip() == '':
                 continue
 
-            status = self._get_value(task, columns, 'status', 'pending')
+            status = self._get_value(task, columns, 'status', 'not_started')
             status_lower = str(status).lower().strip()
 
-            # Map Monday status to milestone status
-            milestone_status = 'completed' if status_lower in ['done', 'completed', 'finished'] else 'in_progress' if status_lower in ['in progress', 'doing', 'working'] else 'pending'
+            # Map Monday status to milestone status (database expects: not_started, in_progress, done)
+            milestone_status = 'done' if status_lower in ['done', 'completed', 'finished'] else 'in_progress' if status_lower in ['in progress', 'doing', 'working'] else 'not_started'
 
             milestone = {
                 'name': str(name),
