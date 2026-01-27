@@ -95,56 +95,115 @@ class MondayImporter:
         return 'seed'
 
     def extract_ideas(self, df: pd.DataFrame, columns: Dict[str, str]) -> List[Dict]:
-        """Extract ideas (projects) from DataFrame"""
+        """Extract ideas (projects) from DataFrame - handles nested subitems"""
         ideas = []
+        current_idea = None
+        current_subitems = []
+        in_subitems_section = False
+        subitem_columns = {}
 
-        # Group by project if available
-        if 'project' in columns:
-            project_col = columns['project']
-            projects = df[project_col].unique()
+        name_col = columns.get('name', df.columns[0])
 
-            for project_name in projects:
-                if pd.isna(project_name):
-                    continue
+        for idx, row in df.iterrows():
+            # Check if this is a "Subitems" header row
+            first_val = str(row[name_col]).strip().lower() if pd.notna(row[name_col]) else ''
 
-                project_df = df[df[project_col] == project_name]
+            if first_val == 'subitems':
+                in_subitems_section = True
+                # Next row after "Subitems" has the subitem column headers
+                # We'll detect them dynamically as we parse
+                continue
 
-                # Get project details from first row
-                first_row = project_df.iloc[0]
+            # If we see a new main item (has data in project column or non-empty name)
+            if not in_subitems_section:
+                # Save previous idea if exists
+                if current_idea is not None:
+                    current_idea['tasks'] = current_subitems
+                    ideas.append(current_idea)
+                    current_subitems = []
 
-                idea = {
-                    'name': str(project_name),
-                    'description': self._get_value(first_row, columns, 'description', f"Imported from Monday.com on {datetime.now().strftime('%Y-%m-%d')}"),
-                    'stage': self.normalize_status(self._get_value(first_row, columns, 'status', 'seed')),
-                    'owner': self._get_value(first_row, columns, 'owner', 'Unassigned'),
-                    'next_steps': f"Review {len(project_df)} imported tasks",
-                    'risk_flags': '',
-                    'tasks': project_df.to_dict('records')  # Keep tasks for milestone extraction
-                }
-
-                ideas.append(idea)
-
-        else:
-            # No project grouping - treat each row as an idea
-            for idx, row in df.iterrows():
-                name = self._get_value(row, columns, 'name', f'Imported Item {idx+1}')
-
+                # Start new idea
+                name = self._get_value(row, columns, 'name', '')
                 if pd.isna(name) or str(name).strip() == '':
                     continue
 
-                idea = {
+                current_idea = {
                     'name': str(name),
                     'description': self._get_value(row, columns, 'description', 'Imported from Monday.com'),
                     'stage': self.normalize_status(self._get_value(row, columns, 'status', 'seed')),
                     'owner': self._get_value(row, columns, 'owner', 'Unassigned'),
                     'next_steps': '',
                     'risk_flags': '',
-                    'tasks': []
                 }
 
-                ideas.append(idea)
+            else:
+                # We're in subitems section - parse as milestone
+                # Look for "Name" column in the row (subitems have their own Name column)
+                subitem_name = None
+                subitem_status = None
+
+                # Try to find the subitem data
+                for col in df.columns:
+                    val = row[col]
+                    if pd.notna(val) and str(val).strip():
+                        col_lower = str(col).lower().strip()
+                        # First non-empty column is usually the subitem name
+                        if subitem_name is None and 'name' in col_lower:
+                            subitem_name = str(val).strip()
+                        elif 'status' in col_lower or 'state' in col_lower:
+                            subitem_status = str(val).strip()
+
+                # If we found a subitem name, add it
+                if subitem_name and subitem_name.lower() not in ['name', 'owner', 'status', 'date', 'text']:
+                    current_subitems.append({
+                        'name': subitem_name,
+                        'status': self._map_subitem_status(subitem_status),
+                        'weight': 10
+                    })
+                else:
+                    # No more subitems, back to main items
+                    in_subitems_section = False
+                    # This row might be a new main item, process it
+                    name = row[name_col]
+                    if pd.notna(name) and str(name).strip():
+                        # Save previous idea
+                        if current_idea is not None:
+                            current_idea['tasks'] = current_subitems
+                            ideas.append(current_idea)
+                            current_subitems = []
+
+                        # Start new idea
+                        current_idea = {
+                            'name': str(name),
+                            'description': self._get_value(row, columns, 'description', 'Imported from Monday.com'),
+                            'stage': self.normalize_status(self._get_value(row, columns, 'status', 'seed')),
+                            'owner': self._get_value(row, columns, 'owner', 'Unassigned'),
+                            'next_steps': '',
+                            'risk_flags': '',
+                        }
+
+        # Don't forget the last idea
+        if current_idea is not None:
+            current_idea['tasks'] = current_subitems
+            ideas.append(current_idea)
 
         return ideas
+
+    def _map_subitem_status(self, status):
+        """Map subitem status to milestone status"""
+        if not status:
+            return 'pending'
+
+        status_lower = str(status).lower().strip()
+
+        if 'done' in status_lower or 'complete' in status_lower:
+            return 'completed'
+        elif 'working' in status_lower or 'progress' in status_lower:
+            return 'in_progress'
+        elif 'stuck' in status_lower or 'blocked' in status_lower:
+            return 'in_progress'  # Mark as in progress but could add flag
+        else:
+            return 'pending'
 
     def extract_milestones(self, tasks: List[Dict], columns: Dict[str, str]) -> List[Dict]:
         """Extract milestones from project tasks"""
