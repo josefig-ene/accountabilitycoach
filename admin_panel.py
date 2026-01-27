@@ -223,7 +223,19 @@ def import_data_panel(db: Database):
 
                 # Show preview of data
                 with st.expander("📋 View Raw Data Preview"):
-                    st.dataframe(df.head(10), use_container_width=True)
+                    # Create a copy for display and fix data types
+                    df_display = df.head(10).copy()
+
+                    # Convert datetime columns to strings for Arrow compatibility
+                    for col in df_display.columns:
+                        if df_display[col].dtype == 'object':
+                            try:
+                                # Try to convert any datetime objects to strings
+                                df_display[col] = df_display[col].apply(lambda x: str(x) if pd.notna(x) else '')
+                            except:
+                                pass
+
+                    st.dataframe(df_display, use_container_width=True)
 
                 st.markdown("---")
 
