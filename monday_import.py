@@ -105,10 +105,15 @@ class MondayImporter:
         name_col = columns.get('name', df.columns[0])
 
         for idx, row in df.iterrows():
-            # Check if this is a "Subitems" header row
-            first_val = str(row[name_col]).strip().lower() if pd.notna(row[name_col]) else ''
+            # Check if this row contains "Subitems" in ANY column
+            is_subitems_marker = False
+            for col in df.columns:
+                val = str(row[col]).strip().lower() if pd.notna(row[col]) else ''
+                if val == 'subitems':
+                    is_subitems_marker = True
+                    break
 
-            if first_val == 'subitems':
+            if is_subitems_marker:
                 in_subitems_section = True
                 self.warnings.append(f"Found 'Subitems' marker at row {idx+1}")
                 # Next row after "Subitems" has the subitem column headers
