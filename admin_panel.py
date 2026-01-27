@@ -326,7 +326,7 @@ def import_data_panel(db: Database):
                         st.write("")  # Spacing
 
                     # Import button
-                    if st.button("🚀 Import Data", type="primary", use_container_width=True):
+                    if st.button("🚀 Import Data", type="primary", use_container_width=True, key="import_monday_data"):
                         # Delete existing if replace mode
                         if import_mode == "Replace all ideas (delete existing)":
                             db.delete_all_ideas()
@@ -365,23 +365,33 @@ def import_data_panel(db: Database):
                                     )
                                     milestone_count += 1
 
-                            st.success(f"""
-                            ✅ **Import Complete!**
-
-                            - Imported {imported_count} ideas
-                            - Created {milestone_count} milestones
-                            """)
-
-                            # Add button to navigate to Studio Cockpit
-                            col1, col2, col3 = st.columns([1, 1, 1])
-                            with col2:
-                                if st.button("🚀 View in Studio Cockpit", type="primary", use_container_width=True):
-                                    st.session_state.current_page = 'studio'
-                                    st.rerun()
+                            # Store success message in session state
+                            st.session_state.import_success = True
+                            st.session_state.imported_count = imported_count
+                            st.session_state.milestone_count = milestone_count
+                            st.rerun()
 
                         except Exception as e:
                             st.error(f"❌ Error during import: {str(e)}")
                             st.info("Some data may have been partially imported. Check Studio Cockpit.")
+
+                    # Show success message if import just completed
+                    if st.session_state.get('import_success', False):
+                        st.success(f"""
+                        ✅ **Import Complete!**
+
+                        - Imported {st.session_state.imported_count} ideas
+                        - Created {st.session_state.milestone_count} milestones
+                        """)
+
+                        # Add button to navigate to Studio Cockpit
+                        col1, col2, col3 = st.columns([1, 1, 1])
+                        with col2:
+                            if st.button("🚀 View in Studio Cockpit", type="primary", use_container_width=True, key="view_studio_after_import"):
+                                # Clear import success flag
+                                st.session_state.import_success = False
+                                st.session_state.current_page = 'studio'
+                                st.rerun()
 
                 else:
                     st.warning("No data could be imported. Please check the file format.")
