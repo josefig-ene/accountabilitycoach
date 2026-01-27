@@ -110,6 +110,7 @@ class MondayImporter:
 
             if first_val == 'subitems':
                 in_subitems_section = True
+                self.warnings.append(f"Found 'Subitems' marker at row {idx+1}")
                 # Next row after "Subitems" has the subitem column headers
                 # We'll detect them dynamically as we parse
                 continue
@@ -120,6 +121,7 @@ class MondayImporter:
                 if current_idea is not None:
                     current_idea['tasks'] = current_subitems
                     ideas.append(current_idea)
+                    self.warnings.append(f"Added idea '{current_idea['name']}' with {len(current_subitems)} subitems")
                     current_subitems = []
 
                 # Start new idea
@@ -154,15 +156,18 @@ class MondayImporter:
                             subitem_status = str(val).strip()
 
                 # If we found a subitem name, add it
-                if subitem_name and subitem_name.lower() not in ['name', 'owner', 'status', 'date', 'text']:
-                    current_subitems.append({
+                if subitem_name and subitem_name.lower() not in ['name', 'owner', 'status', 'date', 'text', 'dependency', 'long text']:
+                    milestone = {
                         'name': subitem_name,
                         'status': self._map_subitem_status(subitem_status),
                         'weight': 10
-                    })
+                    }
+                    current_subitems.append(milestone)
+                    self.warnings.append(f"Found subitem: '{subitem_name}' with status '{subitem_status}' → {milestone['status']}")
                 else:
                     # No more subitems, back to main items
                     in_subitems_section = False
+                    self.warnings.append(f"Exiting subitems section at row {idx+1}")
                     # This row might be a new main item, process it
                     name = row[name_col]
                     if pd.notna(name) and str(name).strip():
@@ -170,6 +175,7 @@ class MondayImporter:
                         if current_idea is not None:
                             current_idea['tasks'] = current_subitems
                             ideas.append(current_idea)
+                            self.warnings.append(f"Added idea '{current_idea['name']}' with {len(current_subitems)} subitems")
                             current_subitems = []
 
                         # Start new idea
@@ -186,6 +192,7 @@ class MondayImporter:
         if current_idea is not None:
             current_idea['tasks'] = current_subitems
             ideas.append(current_idea)
+            self.warnings.append(f"Added final idea '{current_idea['name']}' with {len(current_subitems)} subitems")
 
         return ideas
 
