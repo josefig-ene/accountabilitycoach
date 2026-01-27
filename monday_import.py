@@ -151,43 +151,59 @@ class MondayImporter:
 
             else:
                 # We're in subitems section - parse as milestone
-                # Look for "Name" column in the row (subitems have their own Name column)
                 subitem_name = None
                 subitem_status = None
 
-                # Try to find the subitem data
+                # Collect all non-empty values in this row for debugging
+                row_values = []
+                for col in df.columns:
+                    val = row[col]
+                    if pd.notna(val) and str(val).strip():
+                        row_values.append(f"{col}={str(val).strip()}")
+
+                # Try to find the subitem data - be flexible about which column contains the name
                 for col in df.columns:
                     val = row[col]
                     if pd.notna(val) and str(val).strip():
                         col_lower = str(col).lower().strip()
-                        # First non-empty column is usually the subitem name
-                        if subitem_name is None and 'name' in col_lower:
-                            subitem_name = str(val).strip()
-                        elif 'status' in col_lower or 'state' in col_lower:
-                            subitem_status = str(val).strip()
+                        val_str = str(val).strip()
+
+                        # Look for subitem name in any column (prioritize 'name' columns)
+                        if subitem_name is None:
+                            if 'name' in col_lower or 'item' in col_lower or 'task' in col_lower:
+                                subitem_name = val_str
+                            elif subitem_name is None and len(row_values) > 0:
+                                # If no name column, use first non-empty value
+                                subitem_name = val_str
+
+                        # Look for status
+                        if 'status' in col_lower or 'state' in col_lower:
+                            subitem_status = val_str
+
+                self.warnings.append(f"Row {idx+1} in subitems: values=[{', '.join(row_values)}]")
 
                 # If we found a subitem name, add it
-                if subitem_name and subitem_name.lower() not in ['name', 'owner', 'status', 'date', 'text', 'dependency', 'long text']:
+                if subitem_name and subitem_name.lower() not in ['name', 'owner', 'status', 'date', 'text', 'dependency', 'long text', 'subitems']:
                     milestone = {
                         'name': subitem_name,
                         'status': self._map_subitem_status(subitem_status),
                         'weight': 10
                     }
                     current_subitems.append(milestone)
-                    self.warnings.append(f"Found subitem: '{subitem_name}' with status '{subitem_status}' → {milestone['status']}")
+                    self.warnings.append(f"✓ Found subitem: '{subitem_name}' with status '{subitem_status}' → {milestone['status']}")
                 else:
                     # Check if this row is a new main item (has data in the original name column)
                     main_name = row[name_col]
                     if pd.notna(main_name) and str(main_name).strip() and str(main_name).strip().lower() not in ['name', '']:
                         # This is a new main item - exit subitems section
                         in_subitems_section = False
-                        self.warnings.append(f"Exiting subitems section at row {idx+1} - found new main item")
+                        self.warnings.append(f"Exiting subitems section at row {idx+1} - found new main item '{main_name}'")
 
                         # Save previous idea
                         if current_idea is not None:
                             current_idea['tasks'] = current_subitems
                             ideas.append(current_idea)
-                            self.warnings.append(f"Added idea '{current_idea['name']}' with {len(current_subitems)} subitems")
+                            self.warnings.append(f"✓ Added idea '{current_idea['name']}' with {len(current_subitems)} subitems")
                             current_subitems = []
 
                         # Start new idea
@@ -201,7 +217,7 @@ class MondayImporter:
                         }
                     else:
                         # Empty row or invalid data - just skip it, stay in subitems section
-                        self.warnings.append(f"Skipping row {idx+1} in subitems section (empty or invalid)")
+                        self.warnings.append(f"Skipping row {idx+1} - subitem_name='{subitem_name}' (filtered out or empty)")
 
         # Don't forget the last idea
         if current_idea is not None:
