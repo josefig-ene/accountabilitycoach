@@ -100,11 +100,18 @@ class MondayImporter:
         current_idea = None
         current_subitems = []
         in_subitems_section = False
+        skip_next_row = False  # Skip the header row after "Subitems" marker
         subitem_columns = {}
 
         name_col = columns.get('name', df.columns[0])
 
         for idx, row in df.iterrows():
+            # Skip header row after "Subitems" marker
+            if skip_next_row:
+                skip_next_row = False
+                self.warnings.append(f"Skipping subitem header row at row {idx+1}")
+                continue
+
             # Check if this row contains "Subitems" in ANY column
             is_subitems_marker = False
             for col in df.columns:
@@ -115,9 +122,8 @@ class MondayImporter:
 
             if is_subitems_marker:
                 in_subitems_section = True
+                skip_next_row = True  # Skip the next row (header row)
                 self.warnings.append(f"Found 'Subitems' marker at row {idx+1}")
-                # Next row after "Subitems" has the subitem column headers
-                # We'll detect them dynamically as we parse
                 continue
 
             # If we see a new main item (has data in project column or non-empty name)
@@ -170,12 +176,13 @@ class MondayImporter:
                     current_subitems.append(milestone)
                     self.warnings.append(f"Found subitem: '{subitem_name}' with status '{subitem_status}' → {milestone['status']}")
                 else:
-                    # No more subitems, back to main items
-                    in_subitems_section = False
-                    self.warnings.append(f"Exiting subitems section at row {idx+1}")
-                    # This row might be a new main item, process it
-                    name = row[name_col]
-                    if pd.notna(name) and str(name).strip():
+                    # Check if this row is a new main item (has data in the original name column)
+                    main_name = row[name_col]
+                    if pd.notna(main_name) and str(main_name).strip() and str(main_name).strip().lower() not in ['name', '']:
+                        # This is a new main item - exit subitems section
+                        in_subitems_section = False
+                        self.warnings.append(f"Exiting subitems section at row {idx+1} - found new main item")
+
                         # Save previous idea
                         if current_idea is not None:
                             current_idea['tasks'] = current_subitems
@@ -185,13 +192,16 @@ class MondayImporter:
 
                         # Start new idea
                         current_idea = {
-                            'name': str(name),
+                            'name': str(main_name),
                             'description': self._get_value(row, columns, 'description', 'Imported from Monday.com'),
                             'stage': self.normalize_status(self._get_value(row, columns, 'status', 'seed')),
                             'owner': self._get_value(row, columns, 'owner', 'Unassigned'),
                             'next_steps': '',
                             'risk_flags': '',
                         }
+                    else:
+                        # Empty row or invalid data - just skip it, stay in subitems section
+                        self.warnings.append(f"Skipping row {idx+1} in subitems section (empty or invalid)")
 
         # Don't forget the last idea
         if current_idea is not None:
