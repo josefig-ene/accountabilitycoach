@@ -730,6 +730,8 @@ def data_management(db: Database):
                                     db.add_offer(
                                         offer_name=offer.get('offer_name', 'Untitled'),
                                         ai_score=offer.get('ai_score', 50),
+                                        pricing_fit=offer.get('pricing_fit', 5),
+                                        audience_fit=offer.get('audience_fit', 5),
                                         go_no_go=offer.get('go_no_go', 'Evaluate'),
                                         notes=offer.get('notes', '')
                                     )
