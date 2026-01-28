@@ -221,6 +221,29 @@ def export_to_csv(data, filename):
 def studio_cockpit():
     """Venture Studio Engine - Track Ideas and Milestones"""
 
+    # Handle drag-and-drop moves from Kanban board
+    try:
+        query_params = st.query_params
+        if 'move_idea' in query_params and 'new_stage' in query_params:
+            idea_id = str(query_params['move_idea'])
+            new_stage = str(query_params['new_stage'])
+
+            # Validate stage
+            valid_stages = ['goals', 'planning', 'seed', 'validation', 'mvp', 'pilot', 'scale', 'exit']
+            if new_stage in valid_stages:
+                # Update the idea's stage in the database
+                db.update_idea_stage(idea_id, new_stage)
+
+                # Show success message
+                st.success(f"✅ Idea moved to {new_stage.upper()} stage!")
+
+                # Clear the query parameters and rerun
+                st.query_params.clear()
+                st.rerun()
+    except Exception as e:
+        # Silently ignore any errors in query param processing
+        pass
+
     # Header
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -311,7 +334,7 @@ def studio_cockpit():
                 'exit': '#a67d88'
             }
 
-            # Build HTML for horizontal scrollable Kanban board
+            # Build HTML for horizontal scrollable Kanban board with drag-and-drop
             kanban_html = """
             <style>
                 .kanban-board-wrapper {
@@ -390,10 +413,18 @@ def studio_cockpit():
                     border-left: 4px solid;
                     box-shadow: 0 2px 6px rgba(0,0,0,0.08);
                     transition: all 0.2s;
+                    cursor: move;
                 }
                 .kb-card:hover {
                     transform: translateY(-2px);
                     box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+                }
+                .kb-card.dragging {
+                    opacity: 0.5;
+                }
+                .kb-column.drag-over {
+                    background-color: #e8e6e3;
+                    border: 2px dashed #667eea;
                 }
                 .kb-empty {
                     text-align: center;
@@ -411,7 +442,7 @@ def studio_cockpit():
 
                 kanban_html += f'<div class="kb-column-wrap">'
                 kanban_html += f'<div class="kb-header" style="border-color: {stage_colors[stage]};">{stage_labels[stage]}</div>'
-                kanban_html += f'<div class="kb-column">'
+                kanban_html += f'<div class="kb-column" data-stage="{stage}">'
 
                 if stage_ideas:
                     for idea in stage_ideas:
@@ -422,7 +453,7 @@ def studio_cockpit():
                         owner = str(idea['owner']).replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#39;')
 
                         kanban_html += f'''
-                        <div class="kb-card" style="border-left-color: {stage_colors[stage]};">
+                        <div class="kb-card" draggable="true" data-idea-id="{idea['id']}" data-current-stage="{stage}" style="border-left-color: {stage_colors[stage]};">
                             <div style="font-weight: 600; margin-bottom: 0.75rem; color: #2c3e50; font-size: 1rem;">{name}{risk_badge}</div>
                             <div style="font-size: 0.9rem; color: #5a6c7d; margin-bottom: 0.5rem;">
                                 {confidence_color} {idea['confidence_score']}% confidence
@@ -436,6 +467,83 @@ def studio_cockpit():
                     kanban_html += '<div class="kb-empty">No ideas</div>'
 
                 kanban_html += '</div></div>'
+
+            # Add JavaScript for drag-and-drop functionality
+            kanban_html += '''
+            <script>
+                // Get all cards and columns
+                const cards = document.querySelectorAll('.kb-card');
+                const columns = document.querySelectorAll('.kb-column');
+
+                // Add drag event listeners to cards
+                cards.forEach(card => {
+                    card.addEventListener('dragstart', handleDragStart);
+                    card.addEventListener('dragend', handleDragEnd);
+                });
+
+                // Add drop event listeners to columns
+                columns.forEach(column => {
+                    column.addEventListener('dragover', handleDragOver);
+                    column.addEventListener('drop', handleDrop);
+                    column.addEventListener('dragleave', handleDragLeave);
+                });
+
+                let draggedCard = null;
+
+                function handleDragStart(e) {
+                    draggedCard = this;
+                    this.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/html', this.innerHTML);
+                }
+
+                function handleDragEnd(e) {
+                    this.classList.remove('dragging');
+                }
+
+                function handleDragOver(e) {
+                    if (e.preventDefault) {
+                        e.preventDefault();
+                    }
+                    e.dataTransfer.dropEffect = 'move';
+                    this.classList.add('drag-over');
+                    return false;
+                }
+
+                function handleDragLeave(e) {
+                    this.classList.remove('drag-over');
+                }
+
+                function handleDrop(e) {
+                    if (e.stopPropagation) {
+                        e.stopPropagation();
+                    }
+
+                    this.classList.remove('drag-over');
+
+                    if (draggedCard) {
+                        const ideaId = draggedCard.getAttribute('data-idea-id');
+                        const currentStage = draggedCard.getAttribute('data-current-stage');
+                        const newStage = this.getAttribute('data-stage');
+
+                        // Only update if moved to a different stage
+                        if (currentStage !== newStage) {
+                            // Store the move in localStorage
+                            localStorage.setItem('kanban_move', JSON.stringify({
+                                idea_id: ideaId,
+                                new_stage: newStage,
+                                timestamp: Date.now()
+                            }));
+
+                            // Reload the page to apply the change
+                            window.location.href = window.location.pathname + '?move_idea=' + ideaId + '&new_stage=' + newStage;
+                        }
+                    }
+
+                    return false;
+                }
+            </script>
+            '''
 
             kanban_html += '</div></div>'  # Close kanban-board-container and kanban-board-wrapper
 
