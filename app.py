@@ -535,8 +535,9 @@ def studio_cockpit():
                                 timestamp: Date.now()
                             }));
 
-                            // Reload the page to apply the change
-                            window.location.href = window.location.pathname + '?move_idea=' + ideaId + '&new_stage=' + newStage;
+                            // Reload the parent page to apply the change
+                            // Use window.parent to escape the iframe and reload the actual Streamlit page
+                            window.parent.location.href = window.parent.location.pathname + '?move_idea=' + ideaId + '&new_stage=' + newStage;
                         }
                     }
 
