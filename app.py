@@ -222,9 +222,12 @@ def studio_cockpit():
     """Venture Studio Engine - Track Ideas and Milestones"""
 
     # Handle drag-and-drop moves from Kanban board
+    if 'kanban_processed' not in st.session_state:
+        st.session_state.kanban_processed = False
+
     try:
         query_params = st.query_params
-        if 'move_idea' in query_params and 'new_stage' in query_params:
+        if 'move_idea' in query_params and 'new_stage' in query_params and not st.session_state.kanban_processed:
             idea_id = str(query_params['move_idea'])
             new_stage = str(query_params['new_stage'])
 
@@ -234,12 +237,18 @@ def studio_cockpit():
                 # Update the idea's stage in the database
                 db.update_idea_stage(idea_id, new_stage)
 
+                # Mark as processed to prevent duplicate updates
+                st.session_state.kanban_processed = True
+
                 # Show success message
                 st.success(f"✅ Idea moved to {new_stage.upper()} stage!")
 
                 # Clear the query parameters and rerun
                 st.query_params.clear()
                 st.rerun()
+        elif 'move_idea' not in query_params:
+            # Reset the processed flag when query params are cleared
+            st.session_state.kanban_processed = False
     except Exception as e:
         # Silently ignore any errors in query param processing
         pass
@@ -548,7 +557,10 @@ def studio_cockpit():
 
             kanban_html += '</div></div>'  # Close kanban-board-container and kanban-board-wrapper
 
-            components.html(kanban_html, height=600, scrolling=False)
+            # Use a unique key based on the current data to force component recreation after updates
+            import hashlib
+            kanban_key = hashlib.md5(str([(i['id'], i['stage']) for i in ideas]).encode()).hexdigest()
+            components.html(kanban_html, height=600, scrolling=False, key=f"kanban_{kanban_key}")
 
             # Action panel for idea management
             st.markdown("---")
