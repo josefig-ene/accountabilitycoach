@@ -518,8 +518,36 @@ def data_management(db: Database):
 
     st.warning("⚠️ **Caution:** Data operations cannot be undone. Always export before deleting!")
 
+    # Clear ALL data button
+    st.markdown("### 🚨 Clear All Data")
+    st.error("⚠️ **DANGER ZONE:** This will permanently delete ALL data from the database!")
+
+    col1, col2, col3 = st.columns([2, 1, 1])
+
+    with col1:
+        confirm_clear_all = st.checkbox(
+            "I understand this will DELETE ALL IDEAS, MILESTONES, OFFERS, and ENERGY DATA permanently",
+            key="confirm_clear_all_data"
+        )
+
+    with col2:
+        if st.button("🗑️ CLEAR ALL DATA", type="primary", disabled=not confirm_clear_all, use_container_width=True):
+            with st.spinner("Clearing all data..."):
+                db.delete_all_ideas()  # This also deletes all milestones due to CASCADE
+                db.delete_all_offers()
+                db.delete_all_energy_entries()
+                st.success("✅ All data has been cleared! The database is now empty.")
+                st.balloons()
+                st.info("You can now start fresh or import new data from the 'Import Data' tab.")
+            st.rerun()
+
+    with col3:
+        st.write("")  # Spacing
+
+    st.markdown("---")
+
     # Bulk operations
-    st.markdown("### 🗑️ Bulk Delete Operations")
+    st.markdown("### 🗑️ Individual Bulk Delete Operations")
 
     col1, col2, col3 = st.columns(3)
 
