@@ -53,11 +53,24 @@ def fetch_data(assets, start, end):
     data = {}
     for a in assets:
         try:
-            df = yf.download(a, start=start, end=end, progress=False)['Adj Close']
-            df.name = a
-            data[a] = df
+            df = yf.download(a, start=start, end=end, progress=False, auto_adjust=True)
+            # Handle different yfinance versions - use Close (auto_adjust=True adjusts it)
+            if isinstance(df.columns, pd.MultiIndex):
+                # Newer yfinance with multi-index columns
+                price_col = df['Close'][a] if a in df['Close'].columns else df['Close'].iloc[:, 0]
+            elif 'Close' in df.columns:
+                price_col = df['Close']
+            else:
+                print(f"Warning: Could not find price column for {a}")
+                continue
+
+            price_col.name = a
+            data[a] = price_col
         except Exception as e:
             print(f"Warning: Could not fetch {a} -> {e}")
+
+    if not data:
+        raise ValueError("No data could be fetched for any asset")
 
     df_all = pd.DataFrame(data)
     df_all = df_all.resample('W-FRI').last()  # weekly resample
