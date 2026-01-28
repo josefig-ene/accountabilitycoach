@@ -748,6 +748,62 @@ def render_backtest_page():
     st.markdown("---")
 
     # -------------------------------
+    # VOLATILITY DIAGNOSTICS
+    # -------------------------------
+
+    st.subheader("📈 Volatility Diagnostics")
+
+    if 'vol_mean' in summary:
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Mean Volatility", f"{summary['vol_mean']*100:.2f}%")
+        with col2:
+            st.metric("Median Volatility", f"{summary['vol_median']*100:.2f}%")
+        with col3:
+            st.metric("Min Volatility", f"{summary['vol_min']*100:.2f}%")
+        with col4:
+            st.metric("Max Volatility", f"{summary['vol_max']*100:.2f}%")
+
+        # Volatility histogram with regime thresholds
+        st.write("**Volatility Distribution with Regime Thresholds**")
+
+        fig_vol_hist = go.Figure()
+
+        fig_vol_hist.add_trace(go.Histogram(
+            x=results_df['volatility'] * 100,
+            nbinsx=50,
+            marker_color='steelblue',
+            name='Volatility'
+        ))
+
+        # Add regime threshold lines
+        fig_vol_hist.add_vline(x=1, line_dash="dash", line_color="green",
+                               annotation_text="RANGE < 1%", annotation_position="top")
+        fig_vol_hist.add_vline(x=2, line_dash="dash", line_color="orange",
+                               annotation_text="TREND < 2%", annotation_position="top")
+
+        fig_vol_hist.update_layout(
+            height=300,
+            margin=dict(l=0, r=0, t=50, b=0),
+            xaxis_title="Volatility (%)",
+            yaxis_title="Frequency",
+            showlegend=False
+        )
+        st.plotly_chart(fig_vol_hist, use_container_width=True)
+
+        # Warning if no RANGE
+        if summary.get('vol_below_1pct', 0) == 0:
+            st.warning(
+                f"⚠️ **No RANGE regime detected.** "
+                f"The V1 thresholds (RANGE < 1%, TREND < 2%) may be too low for this 11-asset universe. "
+                f"Mean volatility is {summary['vol_mean']*100:.2f}%, well above the 2% SHOCK threshold. "
+                f"This is expected behavior - the frozen V1 parameters produce mostly SHOCK regimes with this asset mix."
+            )
+
+    st.markdown("---")
+
+    # -------------------------------
     # DETAILED METRICS TABLE
     # -------------------------------
 
@@ -799,7 +855,7 @@ def render_backtest_page():
     with st.expander("🔍 Explore Raw Backtest Data"):
         st.write(f"Showing last 50 weeks of backtest results:")
 
-        display_cols = ['detected_regime', 'effective_regime', 'regime_changed', 'cooldown_active',
+        display_cols = ['detected_regime', 'effective_regime', 'volatility', 'regime_changed', 'cooldown_active',
                         'cash_weight', 'total_invested', 'max_weight_change']
         st.dataframe(results_df[display_cols].tail(50), use_container_width=True)
 

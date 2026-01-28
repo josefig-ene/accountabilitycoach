@@ -46,24 +46,25 @@ def detect_regime_at_point(price_df, idx, lookback=4):
     Uses lookback weeks for volatility calculation.
     """
     if idx < lookback:
-        return None  # Not enough history
+        return None, None  # Not enough history
 
     window = price_df.iloc[idx-lookback:idx+1]
-    returns = window.pct_change().dropna()
+    # Fix FutureWarning: explicitly handle NaN before pct_change
+    returns = window.pct_change(fill_method=None).dropna()
 
     if len(returns) < lookback:
-        return None
+        return None, None
 
     vol = returns.rolling(lookback).std().mean(axis=1).iloc[-1]
 
     if pd.isna(vol):
-        return None
+        return None, None
     elif vol < 0.01:
-        return "RANGE"
+        return "RANGE", vol
     elif vol < 0.02:
-        return "TREND"
+        return "TREND", vol
     else:
-        return "SHOCK"
+        return "SHOCK", vol
 
 
 # -------------------------------
@@ -177,8 +178,8 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
     for idx in range(start_idx, len(price_df)):
         current_date = price_df.index[idx].date()
 
-        # Detect regime using only past data
-        detected_regime = detect_regime_at_point(price_df, idx)
+        # Detect regime using only past data (returns regime and volatility value)
+        detected_regime, vol_value = detect_regime_at_point(price_df, idx)
 
         if detected_regime is None:
             continue
@@ -206,6 +207,7 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
             'date': current_date,
             'detected_regime': detected_regime,      # What volatility says
             'effective_regime': effective_regime,    # What allocator uses
+            'volatility': vol_value,                 # Raw volatility value for diagnostics
             'regime_changed': state.get('regime_changed', False),
             'cooldown_active': state.get('cooldown_active', False),
             'cash_weight': state['cash_weight'],
@@ -280,6 +282,14 @@ def calculate_summary(results_df):
             current_streak = 1
     regime_streaks.append(current_streak)
 
+    # Volatility statistics (for diagnostics)
+    vol_mean = results_df['volatility'].mean()
+    vol_min = results_df['volatility'].min()
+    vol_max = results_df['volatility'].max()
+    vol_median = results_df['volatility'].median()
+    vol_below_1pct = (results_df['volatility'] < 0.01).sum()
+    vol_below_2pct = (results_df['volatility'] < 0.02).sum()
+
     summary = {
         # Basic stats
         'total_weeks': total_weeks,
@@ -293,6 +303,14 @@ def calculate_summary(results_df):
         # Detected regime distribution (raw volatility signals)
         'detected_counts': detected_counts.to_dict(),
         'detected_percentages': detected_pcts.to_dict(),
+
+        # Volatility diagnostics
+        'vol_mean': vol_mean,
+        'vol_min': vol_min,
+        'vol_max': vol_max,
+        'vol_median': vol_median,
+        'vol_below_1pct': vol_below_1pct,
+        'vol_below_2pct': vol_below_2pct,
 
         # Transitions
         'total_regime_changes': regime_changes,
@@ -360,6 +378,15 @@ def print_summary_report(summary):
     print(f"  Cash range: {summary['min_cash_weight']:.1%} - {summary['max_cash_weight']:.1%}")
     print(f"  Avg invested: {summary['avg_invested_weight']:.1%}")
     print(f"  Max invested: {summary['max_invested_weight']:.1%}")
+
+    print("\n--- VOLATILITY DIAGNOSTICS ---")
+    print(f"  Mean volatility: {summary['vol_mean']:.4f} ({summary['vol_mean']*100:.2f}%)")
+    print(f"  Min volatility: {summary['vol_min']:.4f} ({summary['vol_min']*100:.2f}%)")
+    print(f"  Max volatility: {summary['vol_max']:.4f} ({summary['vol_max']*100:.2f}%)")
+    print(f"  Median volatility: {summary['vol_median']:.4f} ({summary['vol_median']*100:.2f}%)")
+    print(f"  Weeks with vol < 1% (RANGE): {summary['vol_below_1pct']}")
+    print(f"  Weeks with vol < 2% (RANGE+TREND): {summary['vol_below_2pct']}")
+    print(f"  ⚠️ RANGE threshold (1%) may be too low for this asset universe")
 
     print("\n--- VALIDATION ---")
     delta_ok = summary['max_single_weight_change'] <= DELTA + 0.001
