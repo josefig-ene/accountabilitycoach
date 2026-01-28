@@ -599,6 +599,34 @@ def data_management(db: Database):
     st.markdown("### 📥 Import All Data")
     st.info("📂 Restore data from a previously exported JSON file")
 
+    # Display success message if import just completed
+    if 'import_success' in st.session_state:
+        success_data = st.session_state['import_success']
+        st.success(f"""
+        ✅ **Import Complete!**
+
+        - Imported {success_data['ideas']} ideas
+        - Imported {success_data['milestones']} milestones
+        - Imported {success_data['offers']} offers
+        - Imported {success_data['energy']} energy entries
+        """)
+        st.balloons()
+
+        # Add button to navigate to Studio Cockpit
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            if st.button("🚀 View in Studio Cockpit", type="primary", use_container_width=True, key="view_studio_after_json_import"):
+                st.session_state.current_page = 'studio'
+                del st.session_state['import_success']  # Clean up
+                st.rerun()
+
+        # Clear the success flag if user continues
+        if st.button("✅ Continue", type="secondary", key="continue_after_import"):
+            del st.session_state['import_success']
+            st.rerun()
+
+        st.markdown("---")
+
     uploaded_json = st.file_uploader(
         "Upload JSON Export File",
         type=['json'],
@@ -719,23 +747,14 @@ def data_management(db: Database):
                                     )
                                     imported_energy += 1
 
-                            # Success message
-                            st.success(f"""
-                            ✅ **Import Complete!**
-
-                            - Imported {imported_ideas} ideas
-                            - Imported {imported_milestones} milestones
-                            - Imported {imported_offers} offers
-                            - Imported {imported_energy} energy entries
-                            """)
-                            st.balloons()
-
-                            # Add button to navigate to Studio Cockpit
-                            col1, col2, col3 = st.columns([1, 1, 1])
-                            with col2:
-                                if st.button("🚀 View in Studio Cockpit", type="primary", use_container_width=True, key="view_studio_after_json_import"):
-                                    st.session_state.current_page = 'studio'
-                                    st.rerun()
+                            # Success message - store in session state for display after rerun
+                            st.session_state['import_success'] = {
+                                'ideas': imported_ideas,
+                                'milestones': imported_milestones,
+                                'offers': imported_offers,
+                                'energy': imported_energy
+                            }
+                            st.rerun()
 
                         except Exception as e:
                             st.error(f"❌ Error during import: {str(e)}")
