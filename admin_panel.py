@@ -9,6 +9,7 @@ from database import Database
 from ai_insights import ai_insights
 from monday_import import MondayImporter
 import json
+from datetime import datetime
 
 
 def admin_panel(db: Database):
@@ -517,6 +518,81 @@ def data_management(db: Database):
     st.subheader("🗂️ Data Management")
 
     st.warning("⚠️ **Caution:** Data operations cannot be undone. Always export before deleting!")
+
+    # Export ALL data section
+    st.markdown("### 📤 Export All Data")
+    st.info("💾 Export all your data to a JSON file for backup or analysis")
+
+    col1, col2, col3 = st.columns([2, 1, 1])
+
+    with col1:
+        st.markdown("Export includes:")
+        st.markdown("- 💡 All Ideas with their details")
+        st.markdown("- 🎯 All Milestones linked to ideas")
+        st.markdown("- 💼 All Offers with AI scores")
+        st.markdown("- 🌿 All Energy tracking entries")
+
+    with col2:
+        # Prepare export data
+        export_data = {
+            "export_metadata": {
+                "exported_at": datetime.now().isoformat(),
+                "app_version": "1.0",
+                "data_types": ["ideas", "milestones", "offers", "energy_entries"]
+            },
+            "ideas": [],
+            "milestones": [],
+            "offers": [],
+            "energy_entries": []
+        }
+
+        # Get all ideas with their milestones
+        all_ideas = db.get_all_ideas()
+        for idea in all_ideas:
+            idea_milestones = db.get_milestones_by_idea(idea['id'])
+            idea_export = idea.copy()
+            idea_export['milestones'] = idea_milestones
+            export_data['ideas'].append(idea_export)
+
+        # Get all milestones (flat list for convenience)
+        for idea in all_ideas:
+            milestones = db.get_milestones_by_idea(idea['id'])
+            export_data['milestones'].extend(milestones)
+
+        # Get all offers
+        export_data['offers'] = db.get_all_offers()
+
+        # Get all energy entries (use large number to get all)
+        export_data['energy_entries'] = db.get_energy_entries(days=10000)
+
+        # Convert to JSON string
+        json_string = json.dumps(export_data, indent=2, default=str)
+
+        # Show stats
+        st.metric("💡 Ideas", len(export_data['ideas']))
+        st.metric("🎯 Milestones", len(export_data['milestones']))
+        st.metric("💼 Offers", len(export_data['offers']))
+        st.metric("🌿 Energy Entries", len(export_data['energy_entries']))
+
+    with col3:
+        st.write("")  # Spacing
+        st.write("")  # Spacing
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"ceo_dashboard_export_{timestamp}.json"
+
+        st.download_button(
+            label="📥 Download Export",
+            data=json_string,
+            file_name=filename,
+            mime="application/json",
+            type="primary",
+            use_container_width=True,
+            help="Download all data as JSON file"
+        )
+
+    st.markdown("---")
 
     # Clear ALL data button
     st.markdown("### 🚨 Clear All Data")
