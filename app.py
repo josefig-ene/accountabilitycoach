@@ -557,10 +557,8 @@ def studio_cockpit():
 
             kanban_html += '</div></div>'  # Close kanban-board-container and kanban-board-wrapper
 
-            # Use a unique key based on the current data to force component recreation after updates
-            import hashlib
-            kanban_key = hashlib.md5(str([(i['id'], i['stage']) for i in ideas]).encode()).hexdigest()
-            components.html(kanban_html, height=600, scrolling=False, key=f"kanban_{kanban_key}")
+            # Render the Kanban board
+            components.html(kanban_html, height=600, scrolling=False)
 
             # Action panel for idea management
             st.markdown("---")
