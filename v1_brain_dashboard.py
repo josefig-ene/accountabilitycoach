@@ -5,6 +5,7 @@ Visualizations, alerts, scheduling, and UI for the V1 Brain Skeleton.
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -18,6 +19,12 @@ from pathlib import Path
 from v1_brain_skeleton import (
     ASSETS, START_DATE, END_DATE, DELTA, ALPHA, COOLDOWN_WEEKS, STATE_FILE,
     fetch_data, load_state, save_state, detect_regime, allocate_capital
+)
+
+# Import backtest module
+from v1_backtest import (
+    run_backtest, calculate_summary, print_summary_report,
+    get_regime_history, get_weight_history, get_exposure_history
 )
 
 # -------------------------------
@@ -457,8 +464,350 @@ def render_dashboard():
 
 
 # -------------------------------
+# BACKTEST PAGE
+# -------------------------------
+
+@st.cache_data(ttl=3600)  # Cache backtest for 1 hour
+def get_backtest_results():
+    """Run and cache backtest results."""
+    df_prices = get_price_data()
+    results_df, summary = run_backtest(df_prices, start_idx=52, verbose=False)
+    return results_df, summary
+
+
+def render_backtest_page():
+    """Render the historical backtest page."""
+    st.title("📜 V1 Brain Historical Backtest")
+    st.caption("Structural validation of allocator logic (1997-present)")
+
+    st.info("⚠️ This backtest validates the V1 rules. It does NOT optimize parameters.")
+
+    # Run backtest button
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("🔄 Re-run Backtest", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+    # Load backtest results
+    try:
+        with st.spinner("Running historical backtest... This may take a moment."):
+            results_df, summary = get_backtest_results()
+    except Exception as e:
+        st.error(f"Error running backtest: {e}")
+        return
+
+    st.success(f"Backtest complete: {summary['total_weeks']} weeks ({summary['start_date']} to {summary['end_date']})")
+
+    st.markdown("---")
+
+    # -------------------------------
+    # SUMMARY METRICS
+    # -------------------------------
+
+    st.subheader("📊 Validation Summary")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        delta_ok = summary['max_single_weight_change'] <= DELTA + 0.001
+        st.metric(
+            "Delta Cap (δ)",
+            f"{'✅ OK' if delta_ok else '❌ FAIL'}",
+            f"Max change: {summary['max_single_weight_change']:.1%}"
+        )
+
+    with col2:
+        st.metric(
+            "Regime Changes",
+            summary['total_regime_changes'],
+            f"Avg {summary['avg_weeks_between_changes']:.1f} wks apart"
+        )
+
+    with col3:
+        st.metric(
+            "Cooldown Active",
+            f"{summary['cooldown_percentage']:.1f}%",
+            f"{summary['cooldown_weeks']} weeks"
+        )
+
+    with col4:
+        st.metric(
+            "Avg Cash Weight",
+            f"{summary['avg_cash_weight']:.1%}",
+            f"Range: {summary['min_cash_weight']:.0%}-{summary['max_cash_weight']:.0%}"
+        )
+
+    st.markdown("---")
+
+    # -------------------------------
+    # REGIME DISTRIBUTION
+    # -------------------------------
+
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        st.subheader("🎯 Regime Distribution")
+
+        regime_data = pd.DataFrame({
+            'Regime': list(summary['regime_counts'].keys()),
+            'Weeks': list(summary['regime_counts'].values()),
+            'Percentage': [summary['regime_percentages'][r] for r in summary['regime_counts'].keys()]
+        })
+
+        fig_regime_pie = go.Figure(data=[go.Pie(
+            labels=regime_data['Regime'],
+            values=regime_data['Weeks'],
+            marker_colors=[REGIME_COLORS.get(r, '#888') for r in regime_data['Regime']],
+            textinfo='label+percent',
+            hole=0.3
+        )])
+
+        fig_regime_pie.update_layout(
+            height=350,
+            margin=dict(l=0, r=0, t=30, b=0)
+        )
+        st.plotly_chart(fig_regime_pie, use_container_width=True)
+
+    with col_right:
+        st.subheader("📈 Regime Streak Stats")
+
+        streak_data = pd.DataFrame({
+            'Metric': ['Average Streak', 'Longest Streak', 'Shortest Streak'],
+            'Weeks': [
+                summary['avg_regime_streak'],
+                summary['max_regime_streak'],
+                summary['min_regime_streak']
+            ]
+        })
+
+        fig_streak = go.Figure(go.Bar(
+            x=streak_data['Metric'],
+            y=streak_data['Weeks'],
+            marker_color=['steelblue', 'green', 'orange']
+        ))
+
+        fig_streak.update_layout(
+            height=350,
+            margin=dict(l=0, r=0, t=30, b=0),
+            yaxis_title="Weeks"
+        )
+        st.plotly_chart(fig_streak, use_container_width=True)
+
+    st.markdown("---")
+
+    # -------------------------------
+    # REGIME TIMELINE
+    # -------------------------------
+
+    st.subheader("🗓️ Regime Timeline")
+
+    # Create regime timeline visualization
+    regime_numeric = results_df['regime'].map({'RANGE': 0, 'TREND': 1, 'SHOCK': 2})
+
+    fig_timeline = go.Figure()
+
+    # Add colored background for regimes
+    for regime, color in [('RANGE', REGIME_COLORS['RANGE']),
+                          ('TREND', REGIME_COLORS['TREND']),
+                          ('SHOCK', REGIME_COLORS['SHOCK'])]:
+        mask = results_df['regime'] == regime
+        if mask.any():
+            fig_timeline.add_trace(go.Scatter(
+                x=results_df.index[mask],
+                y=[regime] * mask.sum(),
+                mode='markers',
+                marker=dict(color=color, size=8, symbol='square'),
+                name=regime
+            ))
+
+    fig_timeline.update_layout(
+        height=200,
+        margin=dict(l=0, r=0, t=30, b=0),
+        yaxis=dict(categoryorder='array', categoryarray=['RANGE', 'TREND', 'SHOCK']),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        hovermode="x unified"
+    )
+    st.plotly_chart(fig_timeline, use_container_width=True)
+
+    st.markdown("---")
+
+    # -------------------------------
+    # ALLOCATION OVER TIME
+    # -------------------------------
+
+    st.subheader("💰 Allocation Over Time")
+
+    # Get weight history
+    weight_history = get_weight_history(results_df)
+
+    # Stacked area chart
+    fig_alloc = go.Figure()
+
+    for col in weight_history.columns:
+        fig_alloc.add_trace(go.Scatter(
+            x=weight_history.index,
+            y=weight_history[col] * 100,
+            name=col,
+            mode='lines',
+            stackgroup='one',
+            hovertemplate='%{y:.1f}%'
+        ))
+
+    fig_alloc.update_layout(
+        height=400,
+        margin=dict(l=0, r=0, t=30, b=0),
+        yaxis_title="Weight (%)",
+        yaxis=dict(range=[0, 105]),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.3),
+        hovermode="x unified"
+    )
+    st.plotly_chart(fig_alloc, use_container_width=True)
+
+    st.markdown("---")
+
+    # -------------------------------
+    # CASH VS INVESTED
+    # -------------------------------
+
+    st.subheader("💵 Cash vs Invested Exposure")
+
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        exposure_history = get_exposure_history(results_df)
+
+        fig_exposure = go.Figure()
+
+        fig_exposure.add_trace(go.Scatter(
+            x=exposure_history.index,
+            y=exposure_history['cash_weight'] * 100,
+            name='Cash',
+            mode='lines',
+            fill='tozeroy',
+            line=dict(color='green')
+        ))
+
+        fig_exposure.add_trace(go.Scatter(
+            x=exposure_history.index,
+            y=exposure_history['total_invested'] * 100,
+            name='Invested',
+            mode='lines',
+            fill='tozeroy',
+            line=dict(color='steelblue')
+        ))
+
+        fig_exposure.update_layout(
+            height=350,
+            margin=dict(l=0, r=0, t=30, b=0),
+            yaxis_title="Weight (%)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02),
+            hovermode="x unified"
+        )
+        st.plotly_chart(fig_exposure, use_container_width=True)
+
+    with col_right:
+        st.subheader("📉 Weight Change Distribution")
+
+        changes = results_df['max_weight_change'][results_df['max_weight_change'] > 0] * 100
+
+        fig_hist = go.Figure(data=[go.Histogram(
+            x=changes,
+            nbinsx=30,
+            marker_color='steelblue'
+        )])
+
+        # Add delta cap line
+        fig_hist.add_vline(x=DELTA*100, line_dash="dash", line_color="red",
+                          annotation_text=f"δ cap ({DELTA:.0%})")
+
+        fig_hist.update_layout(
+            height=350,
+            margin=dict(l=0, r=0, t=30, b=0),
+            xaxis_title="Max Weight Change (%)",
+            yaxis_title="Frequency"
+        )
+        st.plotly_chart(fig_hist, use_container_width=True)
+
+    st.markdown("---")
+
+    # -------------------------------
+    # DETAILED METRICS TABLE
+    # -------------------------------
+
+    st.subheader("📋 Detailed Validation Metrics")
+
+    metrics_df = pd.DataFrame({
+        'Metric': [
+            'Total Weeks Simulated',
+            'Total Regime Changes',
+            'Avg Weeks Between Changes',
+            'Weeks in Cooldown',
+            'Cooldown Percentage',
+            'Max Single Weight Change',
+            'Avg Weight Change (when active)',
+            'Average Cash Weight',
+            'Min Cash Weight',
+            'Max Cash Weight',
+            'Average Invested Weight',
+            'Max Invested Weight',
+            'Avg Regime Streak',
+            'Max Regime Streak'
+        ],
+        'Value': [
+            f"{summary['total_weeks']}",
+            f"{summary['total_regime_changes']}",
+            f"{summary['avg_weeks_between_changes']:.1f} weeks",
+            f"{summary['cooldown_weeks']}",
+            f"{summary['cooldown_percentage']:.1f}%",
+            f"{summary['max_single_weight_change']:.2%}",
+            f"{summary['avg_weight_change']:.2%}",
+            f"{summary['avg_cash_weight']:.1%}",
+            f"{summary['min_cash_weight']:.1%}",
+            f"{summary['max_cash_weight']:.1%}",
+            f"{summary['avg_invested_weight']:.1%}",
+            f"{summary['max_invested_weight']:.1%}",
+            f"{summary['avg_regime_streak']:.1f} weeks",
+            f"{summary['max_regime_streak']} weeks"
+        ]
+    })
+
+    st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+
+    # -------------------------------
+    # RAW DATA EXPLORER
+    # -------------------------------
+
+    with st.expander("🔍 Explore Raw Backtest Data"):
+        st.write(f"Showing last 50 weeks of backtest results:")
+
+        display_cols = ['regime', 'regime_changed', 'cooldown_active',
+                        'cash_weight', 'total_invested', 'max_weight_change']
+        st.dataframe(results_df[display_cols].tail(50), use_container_width=True)
+
+        # Download button
+        csv = results_df.to_csv()
+        st.download_button(
+            label="📥 Download Full Backtest CSV",
+            data=csv,
+            file_name="v1_backtest_results.csv",
+            mime="text/csv"
+        )
+
+
+# -------------------------------
 # MAIN
 # -------------------------------
 
 if __name__ == "__main__":
-    render_dashboard()
+    # Tab navigation
+    tab1, tab2 = st.tabs(["📊 Live Dashboard", "📜 Historical Backtest"])
+
+    with tab1:
+        render_dashboard()
+
+    with tab2:
+        render_backtest_page()
