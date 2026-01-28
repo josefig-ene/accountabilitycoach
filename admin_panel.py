@@ -595,6 +595,163 @@ def data_management(db: Database):
 
     st.markdown("---")
 
+    # Import ALL data section
+    st.markdown("### 📥 Import All Data")
+    st.info("📂 Restore data from a previously exported JSON file")
+
+    uploaded_json = st.file_uploader(
+        "Upload JSON Export File",
+        type=['json'],
+        help="Upload a JSON file exported from this app",
+        key="json_import_uploader"
+    )
+
+    if uploaded_json is not None:
+        try:
+            # Parse JSON file
+            import_data = json.loads(uploaded_json.read())
+
+            # Validate structure
+            required_keys = ["export_metadata", "ideas", "milestones", "offers", "energy_entries"]
+            if not all(key in import_data for key in required_keys):
+                st.error("❌ Invalid export file format. Missing required data sections.")
+            else:
+                st.success(f"✅ Valid export file uploaded")
+
+                # Show metadata
+                metadata = import_data.get('export_metadata', {})
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Export Information:**")
+                    if 'exported_at' in metadata:
+                        st.write(f"📅 Exported: {metadata['exported_at']}")
+                    if 'app_version' in metadata:
+                        st.write(f"🔖 Version: {metadata['app_version']}")
+
+                with col2:
+                    st.markdown("**Data Counts:**")
+                    st.write(f"💡 Ideas: {len(import_data.get('ideas', []))}")
+                    st.write(f"🎯 Milestones: {len(import_data.get('milestones', []))}")
+                    st.write(f"💼 Offers: {len(import_data.get('offers', []))}")
+                    st.write(f"🌿 Energy Entries: {len(import_data.get('energy_entries', []))}")
+
+                st.markdown("---")
+
+                # Import options
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    import_mode = st.radio(
+                        "Import Mode",
+                        ["Add to existing data", "Replace all data (delete existing first)"],
+                        help="Choose whether to add to or replace your current data"
+                    )
+
+                    st.warning("⚠️ **Important:** Ideas and milestones will be imported with new IDs. The old IDs from the export will not be preserved.")
+
+                with col2:
+                    st.write("")  # Spacing
+                    st.write("")  # Spacing
+
+                    if st.button("🚀 Import Data", type="primary", use_container_width=True, key="import_json_data"):
+                        try:
+                            # Delete existing if replace mode
+                            if import_mode == "Replace all data (delete existing first)":
+                                with st.spinner("Clearing existing data..."):
+                                    db.delete_all_ideas()
+                                    db.delete_all_offers()
+                                    db.delete_all_energy_entries()
+                                    st.info("🗑️ Existing data cleared")
+
+                            # Import ideas with milestones
+                            imported_ideas = 0
+                            imported_milestones = 0
+
+                            with st.spinner("Importing ideas and milestones..."):
+                                for idea_data in import_data.get('ideas', []):
+                                    # Extract milestones from idea (if nested)
+                                    nested_milestones = idea_data.get('milestones', [])
+
+                                    # Add idea
+                                    idea_id = db.add_idea(
+                                        name=idea_data.get('name', 'Untitled'),
+                                        description=idea_data.get('description', ''),
+                                        stage=idea_data.get('stage', 'seed'),
+                                        owner=idea_data.get('owner', ''),
+                                        next_steps=idea_data.get('next_steps', ''),
+                                        risk_flags=idea_data.get('risk_flags', '')
+                                    )
+                                    imported_ideas += 1
+
+                                    # Add nested milestones
+                                    for milestone in nested_milestones:
+                                        db.add_milestone(
+                                            idea_id=idea_id,
+                                            milestone_name=milestone.get('milestone_name', 'Untitled'),
+                                            category=milestone.get('category', 'business'),
+                                            status=milestone.get('status', 'pending'),
+                                            weight=milestone.get('weight', 1),
+                                            notes=milestone.get('notes', 'Imported from backup')
+                                        )
+                                        imported_milestones += 1
+
+                            # Import offers
+                            imported_offers = 0
+                            with st.spinner("Importing offers..."):
+                                for offer in import_data.get('offers', []):
+                                    db.add_offer(
+                                        offer_name=offer.get('offer_name', 'Untitled'),
+                                        ai_score=offer.get('ai_score', 50),
+                                        go_no_go=offer.get('go_no_go', 'Evaluate'),
+                                        notes=offer.get('notes', '')
+                                    )
+                                    imported_offers += 1
+
+                            # Import energy entries
+                            imported_energy = 0
+                            with st.spinner("Importing energy entries..."):
+                                for entry in import_data.get('energy_entries', []):
+                                    db.add_energy_entry(
+                                        date=entry.get('date'),
+                                        energy_score=entry.get('energy_score', 5),
+                                        recovery_block=entry.get('recovery_block', False),
+                                        notes=entry.get('notes', '')
+                                    )
+                                    imported_energy += 1
+
+                            # Success message
+                            st.success(f"""
+                            ✅ **Import Complete!**
+
+                            - Imported {imported_ideas} ideas
+                            - Imported {imported_milestones} milestones
+                            - Imported {imported_offers} offers
+                            - Imported {imported_energy} energy entries
+                            """)
+                            st.balloons()
+
+                            # Add button to navigate to Studio Cockpit
+                            col1, col2, col3 = st.columns([1, 1, 1])
+                            with col2:
+                                if st.button("🚀 View in Studio Cockpit", type="primary", use_container_width=True, key="view_studio_after_json_import"):
+                                    st.session_state.current_page = 'studio'
+                                    st.rerun()
+
+                        except Exception as e:
+                            st.error(f"❌ Error during import: {str(e)}")
+                            with st.expander("🔍 Error Details"):
+                                import traceback
+                                st.code(traceback.format_exc())
+
+        except json.JSONDecodeError as e:
+            st.error(f"❌ Invalid JSON file: {str(e)}")
+        except Exception as e:
+            st.error(f"❌ Error reading file: {str(e)}")
+    else:
+        st.caption("👆 Upload a JSON export file to restore your data")
+
+    st.markdown("---")
+
     # Clear ALL data button
     st.markdown("### 🚨 Clear All Data")
     st.error("⚠️ **DANGER ZONE:** This will permanently delete ALL data from the database!")
