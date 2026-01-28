@@ -610,7 +610,6 @@ def data_management(db: Database):
         - Imported {success_data['offers']} offers
         - Imported {success_data['energy']} energy entries
         """)
-        st.balloons()
 
         # Add button to navigate to Studio Cockpit
         col1, col2, col3 = st.columns([1, 1, 1])
