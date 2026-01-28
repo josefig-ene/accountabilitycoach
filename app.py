@@ -246,12 +246,16 @@ def studio_cockpit():
                 # Clear the query parameters and rerun
                 st.query_params.clear()
                 st.rerun()
+            else:
+                st.error(f"❌ Invalid stage: {new_stage}")
+                st.query_params.clear()
         elif 'move_idea' not in query_params:
             # Reset the processed flag when query params are cleared
             st.session_state.kanban_processed = False
     except Exception as e:
-        # Silently ignore any errors in query param processing
-        pass
+        # Show error to help with debugging
+        st.error(f"❌ Error processing card move: {str(e)}")
+        st.query_params.clear()
 
     # Header
     col1, col2 = st.columns([3, 1])
@@ -586,6 +590,41 @@ def studio_cockpit():
                             db.delete_idea(selected_idea['id'])
                             st.success(f"Deleted '{selected_idea['name']}'")
                             st.rerun()
+
+                    # Edit Form
+                    with st.expander(f"✏️ Edit Idea: {selected_idea['name']}", expanded=False):
+                        with st.form(f"edit_idea_form_{selected_idea['id']}"):
+                            edit_name = st.text_input("Idea Name", value=selected_idea['name'])
+
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                stages = ['goals', 'planning', 'seed', 'validation', 'mvp', 'pilot', 'scale', 'exit']
+                                current_stage_idx = stages.index(selected_idea['stage']) if selected_idea['stage'] in stages else 0
+                                edit_stage = st.selectbox("Stage", stages, index=current_stage_idx)
+                            with col2:
+                                edit_owner = st.text_input("Owner", value=selected_idea.get('owner', ''))
+
+                            edit_description = st.text_area("Description", value=selected_idea.get('description', ''))
+                            edit_next_steps = st.text_area("Next Steps", value=selected_idea.get('next_steps', ''))
+                            edit_risk_flags = st.text_input("Risk Flags", value=selected_idea.get('risk_flags', ''))
+
+                            submitted = st.form_submit_button("💾 Save Changes")
+
+                            if submitted:
+                                if edit_name and edit_owner:
+                                    db.update_idea(
+                                        selected_idea['id'],
+                                        name=edit_name,
+                                        description=edit_description,
+                                        stage=edit_stage,
+                                        owner=edit_owner,
+                                        next_steps=edit_next_steps,
+                                        risk_flags=edit_risk_flags
+                                    )
+                                    st.success(f"✅ Updated '{edit_name}' successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error("Name and Owner are required fields.")
 
             st.markdown("---")
 

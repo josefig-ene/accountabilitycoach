@@ -247,6 +247,47 @@ class Database:
         conn.commit()
         conn.close()
 
+    def update_idea(self, idea_id: str, name: str = None, description: str = None,
+                   stage: str = None, owner: str = None, next_steps: str = None,
+                   risk_flags: str = None):
+        """Update idea fields (only updates provided fields)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Build dynamic update query based on provided fields
+        updates = []
+        params = []
+
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description)
+        if stage is not None:
+            updates.append("stage = ?")
+            params.append(stage)
+        if owner is not None:
+            updates.append("owner = ?")
+            params.append(owner)
+        if next_steps is not None:
+            updates.append("next_steps = ?")
+            params.append(next_steps)
+        if risk_flags is not None:
+            updates.append("risk_flags = ?")
+            params.append(risk_flags)
+
+        if updates:
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(idea_id)
+
+            query = f"UPDATE ideas SET {', '.join(updates)} WHERE id = ?"
+            cursor.execute(query, params)
+
+            conn.commit()
+
+        conn.close()
+
     def delete_idea(self, idea_id: str):
         """Delete an idea and its milestones"""
         conn = self.get_connection()
