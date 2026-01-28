@@ -523,51 +523,56 @@ def data_management(db: Database):
     st.markdown("### 📤 Export All Data")
     st.info("💾 Export all your data to a JSON file for backup or analysis")
 
+    # Prepare export data BEFORE columns to avoid rendering issues
+    export_data = {
+        "export_metadata": {
+            "exported_at": datetime.now().isoformat(),
+            "app_version": "1.0",
+            "data_types": ["ideas", "milestones", "offers", "energy_entries"]
+        },
+        "ideas": [],
+        "milestones": [],
+        "offers": [],
+        "energy_entries": []
+    }
+
+    # Get all ideas with their milestones
+    all_ideas = db.get_all_ideas()
+    for idea in all_ideas:
+        idea_milestones = db.get_milestones_by_idea(idea['id'])
+        idea_export = idea.copy()
+        idea_export['milestones'] = idea_milestones
+        export_data['ideas'].append(idea_export)
+
+    # Get all milestones (flat list for convenience)
+    for idea in all_ideas:
+        milestones = db.get_milestones_by_idea(idea['id'])
+        export_data['milestones'].extend(milestones)
+
+    # Get all offers
+    export_data['offers'] = db.get_all_offers()
+
+    # Get all energy entries (use large number to get all)
+    export_data['energy_entries'] = db.get_energy_entries(days=10000)
+
+    # Convert to JSON string
+    json_string = json.dumps(export_data, indent=2, default=str)
+
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"ceo_dashboard_export_{timestamp}.json"
+
+    # Now display in columns
     col1, col2, col3 = st.columns([2, 1, 1])
 
     with col1:
-        st.markdown("Export includes:")
+        st.markdown("**Export includes:**")
         st.markdown("- 💡 All Ideas with their details")
         st.markdown("- 🎯 All Milestones linked to ideas")
         st.markdown("- 💼 All Offers with AI scores")
         st.markdown("- 🌿 All Energy tracking entries")
 
     with col2:
-        # Prepare export data
-        export_data = {
-            "export_metadata": {
-                "exported_at": datetime.now().isoformat(),
-                "app_version": "1.0",
-                "data_types": ["ideas", "milestones", "offers", "energy_entries"]
-            },
-            "ideas": [],
-            "milestones": [],
-            "offers": [],
-            "energy_entries": []
-        }
-
-        # Get all ideas with their milestones
-        all_ideas = db.get_all_ideas()
-        for idea in all_ideas:
-            idea_milestones = db.get_milestones_by_idea(idea['id'])
-            idea_export = idea.copy()
-            idea_export['milestones'] = idea_milestones
-            export_data['ideas'].append(idea_export)
-
-        # Get all milestones (flat list for convenience)
-        for idea in all_ideas:
-            milestones = db.get_milestones_by_idea(idea['id'])
-            export_data['milestones'].extend(milestones)
-
-        # Get all offers
-        export_data['offers'] = db.get_all_offers()
-
-        # Get all energy entries (use large number to get all)
-        export_data['energy_entries'] = db.get_energy_entries(days=10000)
-
-        # Convert to JSON string
-        json_string = json.dumps(export_data, indent=2, default=str)
-
         # Show stats
         st.metric("💡 Ideas", len(export_data['ideas']))
         st.metric("🎯 Milestones", len(export_data['milestones']))
@@ -577,10 +582,6 @@ def data_management(db: Database):
     with col3:
         st.write("")  # Spacing
         st.write("")  # Spacing
-
-        # Generate filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"ceo_dashboard_export_{timestamp}.json"
 
         st.download_button(
             label="📥 Download Export",
