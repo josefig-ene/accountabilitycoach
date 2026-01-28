@@ -75,6 +75,11 @@ def allocate_at_point(state, new_regime, current_date):
     Apply V1 allocation rules at a specific point in time.
     Uses exact same logic as v1_brain_skeleton.py
     """
+    # Reset flags at start of each call
+    state['cooldown_active'] = False
+    state['regime_changed'] = False
+    state['weight_changes'] = {}
+
     last_alloc_date = state['last_allocation_date']
 
     # Cooldown check
@@ -84,10 +89,7 @@ def allocate_at_point(state, new_regime, current_date):
             state['cooldown_active'] = True
             return state  # cooldown active
 
-    state['cooldown_active'] = False
-
     if new_regime == state['last_regime']:
-        state['regime_changed'] = False
         return state  # no regime change
 
     state['regime_changed'] = True
@@ -176,9 +178,9 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
         current_date = price_df.index[idx].date()
 
         # Detect regime using only past data
-        regime = detect_regime_at_point(price_df, idx)
+        detected_regime = detect_regime_at_point(price_df, idx)
 
-        if regime is None:
+        if detected_regime is None:
             continue
 
         # Store pre-allocation state for comparison
@@ -187,7 +189,11 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
         old_cash = state['cash_weight']
 
         # Apply allocation rules
-        state = allocate_at_point(state, regime, current_date)
+        state = allocate_at_point(state, detected_regime, current_date)
+
+        # Effective regime is what the allocator is using (last_regime after allocation)
+        # This accounts for cooldown blocking regime changes
+        effective_regime = state['last_regime'] if state['last_regime'] else detected_regime
 
         # Calculate metrics for this week
         total_invested = sum(state['weights'].values())
@@ -198,7 +204,8 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
         # Record result
         result = {
             'date': current_date,
-            'regime': regime,
+            'detected_regime': detected_regime,      # What volatility says
+            'effective_regime': effective_regime,    # What allocator uses
             'regime_changed': state.get('regime_changed', False),
             'cooldown_active': state.get('cooldown_active', False),
             'cash_weight': state['cash_weight'],
@@ -231,11 +238,18 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
 def calculate_summary(results_df):
     """Calculate summary statistics from backtest results."""
 
-    # Regime statistics
-    regime_counts = results_df['regime'].value_counts()
-    regime_pcts = results_df['regime'].value_counts(normalize=True) * 100
+    # Use effective_regime for allocation-related stats
+    regime_col = 'effective_regime'
 
-    # Regime transitions
+    # Regime statistics (based on effective regime - what allocator uses)
+    regime_counts = results_df[regime_col].value_counts()
+    regime_pcts = results_df[regime_col].value_counts(normalize=True) * 100
+
+    # Detected regime stats (raw volatility signals)
+    detected_counts = results_df['detected_regime'].value_counts()
+    detected_pcts = results_df['detected_regime'].value_counts(normalize=True) * 100
+
+    # Regime transitions (actual allocation changes)
     regime_changes = results_df['regime_changed'].sum()
     total_weeks = len(results_df)
 
@@ -255,11 +269,11 @@ def calculate_summary(results_df):
     avg_invested = results_df['total_invested'].mean()
     max_invested = results_df['total_invested'].max()
 
-    # Time in each regime
+    # Time in each effective regime (what allocator uses)
     regime_streaks = []
     current_streak = 1
     for i in range(1, len(results_df)):
-        if results_df['regime'].iloc[i] == results_df['regime'].iloc[i-1]:
+        if results_df[regime_col].iloc[i] == results_df[regime_col].iloc[i-1]:
             current_streak += 1
         else:
             regime_streaks.append(current_streak)
@@ -272,9 +286,13 @@ def calculate_summary(results_df):
         'start_date': results_df.index[0],
         'end_date': results_df.index[-1],
 
-        # Regime distribution
+        # Effective regime distribution (what allocator uses)
         'regime_counts': regime_counts.to_dict(),
         'regime_percentages': regime_pcts.to_dict(),
+
+        # Detected regime distribution (raw volatility signals)
+        'detected_counts': detected_counts.to_dict(),
+        'detected_percentages': detected_pcts.to_dict(),
 
         # Transitions
         'total_regime_changes': regime_changes,
@@ -295,7 +313,7 @@ def calculate_summary(results_df):
         'avg_invested_weight': avg_invested,
         'max_invested_weight': max_invested,
 
-        # Regime streaks
+        # Regime streaks (effective)
         'avg_regime_streak': np.mean(regime_streaks),
         'max_regime_streak': max(regime_streaks),
         'min_regime_streak': min(regime_streaks),
@@ -361,7 +379,7 @@ def print_summary_report(summary):
 
 def get_regime_history(results_df):
     """Extract regime history for plotting."""
-    return results_df[['regime']].copy()
+    return results_df[['detected_regime', 'effective_regime']].copy()
 
 
 def get_weight_history(results_df):

@@ -600,18 +600,16 @@ def render_backtest_page():
     # REGIME TIMELINE
     # -------------------------------
 
-    st.subheader("🗓️ Regime Timeline")
+    st.subheader("🗓️ Effective Regime Timeline (Allocator State)")
 
-    # Create regime timeline visualization
-    regime_numeric = results_df['regime'].map({'RANGE': 0, 'TREND': 1, 'SHOCK': 2})
-
+    # Create regime timeline visualization using EFFECTIVE regime (what allocator uses)
     fig_timeline = go.Figure()
 
-    # Add colored background for regimes
+    # Plot effective regime (what the allocator actually uses)
     for regime, color in [('RANGE', REGIME_COLORS['RANGE']),
                           ('TREND', REGIME_COLORS['TREND']),
                           ('SHOCK', REGIME_COLORS['SHOCK'])]:
-        mask = results_df['regime'] == regime
+        mask = results_df['effective_regime'] == regime
         if mask.any():
             fig_timeline.add_trace(go.Scatter(
                 x=results_df.index[mask],
@@ -630,6 +628,23 @@ def render_backtest_page():
         hovermode="x unified"
     )
     st.plotly_chart(fig_timeline, use_container_width=True)
+
+    # Optional: Show detected vs effective comparison
+    with st.expander("Compare Detected vs Effective Regime"):
+        st.caption("Detected = raw volatility signal | Effective = what allocator acts on (after cooldown)")
+
+        col_det, col_eff = st.columns(2)
+
+        with col_det:
+            st.write("**Detected Regime (Raw Signal)**")
+            if 'detected_counts' in summary:
+                for r, pct in summary['detected_percentages'].items():
+                    st.write(f"  {r}: {pct:.1f}%")
+
+        with col_eff:
+            st.write("**Effective Regime (Allocator)**")
+            for r, pct in summary['regime_percentages'].items():
+                st.write(f"  {r}: {pct:.1f}%")
 
     st.markdown("---")
 
@@ -784,7 +799,7 @@ def render_backtest_page():
     with st.expander("🔍 Explore Raw Backtest Data"):
         st.write(f"Showing last 50 weeks of backtest results:")
 
-        display_cols = ['regime', 'regime_changed', 'cooldown_active',
+        display_cols = ['detected_regime', 'effective_regime', 'regime_changed', 'cooldown_active',
                         'cash_weight', 'total_invested', 'max_weight_change']
         st.dataframe(results_df[display_cols].tail(50), use_container_width=True)
 
