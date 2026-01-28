@@ -57,14 +57,14 @@ ASSET_NAMES = {
 }
 
 # -------------------------------
-# REGIME COLORS
+# REGIME COLORS (semantic: permission to take risk)
 # -------------------------------
 
 REGIME_COLORS = {
-    'TREND': '#00cc66',   # Green
-    'RANGE': '#ffcc00',   # Yellow
-    'SHOCK': '#ff4444',   # Red
-    None: '#888888'       # Gray
+    'RISK_ON': '#00cc66',       # Green - environment permits risk
+    'RISK_NEUTRAL': '#ffcc00',  # Yellow - defensive posture
+    'RISK_OFF': '#ff4444',      # Red - capital preservation
+    None: '#888888'             # Gray
 }
 
 # -------------------------------
@@ -305,13 +305,13 @@ def render_dashboard():
 
         fig_vol = go.Figure()
 
-        # Add regime zones as shaded areas
+        # Add regime zones as shaded areas (regime = permission level)
         fig_vol.add_hrect(y0=0, y1=1, fillcolor="green", opacity=0.1,
-                         annotation_text="RANGE", annotation_position="top left")
+                         annotation_text="RISK_NEUTRAL", annotation_position="top left")
         fig_vol.add_hrect(y0=1, y1=2, fillcolor="yellow", opacity=0.1,
-                         annotation_text="TREND", annotation_position="top left")
+                         annotation_text="RISK_ON", annotation_position="top left")
         fig_vol.add_hrect(y0=2, y1=vol_df.max()*1.1, fillcolor="red", opacity=0.1,
-                         annotation_text="SHOCK", annotation_position="top left")
+                         annotation_text="RISK_OFF", annotation_position="top left")
 
         fig_vol.add_trace(go.Scatter(
             x=vol_df.index,
@@ -403,14 +403,14 @@ def render_dashboard():
     st.subheader("📋 Regime Target Weights")
 
     regime_table = pd.DataFrame({
-        'Regime': ['TREND', 'RANGE', 'SHOCK'],
+        'Regime': ['RISK_ON', 'RISK_NEUTRAL', 'RISK_OFF'],
         'Per-Asset Weight': ['8%', '5%', '0%'],
         'Total Asset Weight': ['88%', '55%', '0%'],
         'Cash Weight': ['12%', '45%', '100%'],
         'Description': [
-            'Moderate volatility - spread exposure across assets',
-            'Low volatility - light exposure, higher cash',
-            'High volatility - full de-risk to cash'
+            'Environment permits directional risk-taking',
+            'Noise dominates - defensive posture',
+            'Capital preservation priority'
         ]
     })
 
@@ -605,10 +605,10 @@ def render_backtest_page():
     # Create regime timeline visualization using EFFECTIVE regime (what allocator uses)
     fig_timeline = go.Figure()
 
-    # Plot effective regime (what the allocator actually uses)
-    for regime, color in [('RANGE', REGIME_COLORS['RANGE']),
-                          ('TREND', REGIME_COLORS['TREND']),
-                          ('SHOCK', REGIME_COLORS['SHOCK'])]:
+    # Plot effective regime (what the allocator actually uses - permission level)
+    for regime, color in [('RISK_NEUTRAL', REGIME_COLORS['RISK_NEUTRAL']),
+                          ('RISK_ON', REGIME_COLORS['RISK_ON']),
+                          ('RISK_OFF', REGIME_COLORS['RISK_OFF'])]:
         mask = results_df['effective_regime'] == regime
         if mask.any():
             fig_timeline.add_trace(go.Scatter(
@@ -622,7 +622,7 @@ def render_backtest_page():
     fig_timeline.update_layout(
         height=200,
         margin=dict(l=0, r=0, t=30, b=0),
-        yaxis=dict(categoryorder='array', categoryarray=['RANGE', 'TREND', 'SHOCK']),
+        yaxis=dict(categoryorder='array', categoryarray=['RISK_NEUTRAL', 'RISK_ON', 'RISK_OFF']),
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
         hovermode="x unified"
@@ -779,9 +779,9 @@ def render_backtest_page():
 
         # Add regime threshold lines
         fig_vol_hist.add_vline(x=1, line_dash="dash", line_color="green",
-                               annotation_text="RANGE < 1%", annotation_position="top")
+                               annotation_text="RISK_NEUTRAL < 1%", annotation_position="top")
         fig_vol_hist.add_vline(x=2, line_dash="dash", line_color="orange",
-                               annotation_text="TREND < 2%", annotation_position="top")
+                               annotation_text="RISK_ON < 2%", annotation_position="top")
 
         fig_vol_hist.update_layout(
             height=300,
@@ -792,13 +792,13 @@ def render_backtest_page():
         )
         st.plotly_chart(fig_vol_hist, use_container_width=True)
 
-        # Warning if no RANGE
+        # Warning if no RISK_NEUTRAL
         if summary.get('vol_below_1pct', 0) == 0:
             st.warning(
-                f"⚠️ **No RANGE regime detected.** "
-                f"The V1 thresholds (RANGE < 1%, TREND < 2%) may be too low for this 11-asset universe. "
-                f"Mean volatility is {summary['vol_mean']*100:.2f}%, well above the 2% SHOCK threshold. "
-                f"This is expected behavior - the frozen V1 parameters produce mostly SHOCK regimes with this asset mix."
+                f"⚠️ **No RISK_NEUTRAL regime detected.** "
+                f"The V1 thresholds (RISK_NEUTRAL < 1%, RISK_ON < 2%) may be too low for this 11-asset universe. "
+                f"Mean volatility is {summary['vol_mean']*100:.2f}%, well above the 2% RISK_OFF threshold. "
+                f"This is expected behavior - the frozen V1 parameters produce mostly RISK_OFF regimes with this asset mix."
             )
 
     st.markdown("---")

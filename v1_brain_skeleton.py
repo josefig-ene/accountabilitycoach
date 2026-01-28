@@ -110,21 +110,21 @@ def detect_regime(price_df):
     """
     Simple V1 volatility-based regime detection.
 
-    Regimes:
-    - RANGE: Low volatility (vol < 1%)
-    - TREND: Moderate volatility (1% <= vol < 2%)
-    - SHOCK: High volatility (vol >= 2%)
+    Regimes (semantic: permission to take risk, not price signals):
+    - RISK_NEUTRAL: Low volatility environment (vol < 1%) - defensive posture
+    - RISK_ON: Moderate volatility (1% <= vol < 2%) - environment permits risk
+    - RISK_OFF: High volatility (vol >= 2%) - capital preservation mode
     """
     returns = price_df.pct_change().dropna()
     vol = returns.rolling(4).std().mean(axis=1).iloc[-1]  # avg vol last month
 
     # Thresholds are illustrative
     if vol < 0.01:
-        return "RANGE"
+        return "RISK_NEUTRAL"
     elif vol < 0.02:
-        return "TREND"
+        return "RISK_ON"
     else:
-        return "SHOCK"
+        return "RISK_OFF"
 
 
 # -------------------------------
@@ -152,15 +152,18 @@ def allocate_capital(state, new_regime):
     if new_regime == state['last_regime']:
         return state  # no regime change
 
-    # Example target weights per regime (simplified)
+    # Target weights per regime (regime = permission level, not signal)
     target_weights = {}
-    if new_regime == "TREND":
+    if new_regime == "RISK_ON":
+        # Environment permits directional risk-taking
         target_weights = {a: 0.08 for a in ASSETS}  # spread exposure (sum ~88%)
         cash_target = 0.12
-    elif new_regime == "RANGE":
+    elif new_regime == "RISK_NEUTRAL":
+        # Noise dominates, defensive posture
         target_weights = {a: 0.05 for a in ASSETS}  # light exposure
         cash_target = 0.45
-    elif new_regime == "SHOCK":
+    elif new_regime == "RISK_OFF":
+        # Capital preservation priority
         target_weights = {a: 0.0 for a in ASSETS}   # de-risk
         cash_target = 1.0
     else:

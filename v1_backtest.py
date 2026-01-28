@@ -60,11 +60,11 @@ def detect_regime_at_point(price_df, idx, lookback=4):
     if pd.isna(vol):
         return None, None
     elif vol < 0.01:
-        return "RANGE", vol
+        return "RISK_NEUTRAL", vol
     elif vol < 0.02:
-        return "TREND", vol
+        return "RISK_ON", vol
     else:
-        return "SHOCK", vol
+        return "RISK_OFF", vol
 
 
 # -------------------------------
@@ -95,14 +95,17 @@ def allocate_at_point(state, new_regime, current_date):
 
     state['regime_changed'] = True
 
-    # Target weights per regime (same as V1)
-    if new_regime == "TREND":
+    # Target weights per regime (regime = permission level, not signal)
+    if new_regime == "RISK_ON":
+        # Environment permits directional risk-taking
         target_weights = {a: 0.08 for a in ASSETS}
         cash_target = 0.12
-    elif new_regime == "RANGE":
+    elif new_regime == "RISK_NEUTRAL":
+        # Noise dominates, defensive posture
         target_weights = {a: 0.05 for a in ASSETS}
         cash_target = 0.45
-    elif new_regime == "SHOCK":
+    elif new_regime == "RISK_OFF":
+        # Capital preservation priority
         target_weights = {a: 0.0 for a in ASSETS}
         cash_target = 1.0
     else:
@@ -384,9 +387,9 @@ def print_summary_report(summary):
     print(f"  Min volatility: {summary['vol_min']:.4f} ({summary['vol_min']*100:.2f}%)")
     print(f"  Max volatility: {summary['vol_max']:.4f} ({summary['vol_max']*100:.2f}%)")
     print(f"  Median volatility: {summary['vol_median']:.4f} ({summary['vol_median']*100:.2f}%)")
-    print(f"  Weeks with vol < 1% (RANGE): {summary['vol_below_1pct']}")
-    print(f"  Weeks with vol < 2% (RANGE+TREND): {summary['vol_below_2pct']}")
-    print(f"  ⚠️ RANGE threshold (1%) may be too low for this asset universe")
+    print(f"  Weeks with vol < 1% (RISK_NEUTRAL): {summary['vol_below_1pct']}")
+    print(f"  Weeks with vol < 2% (RISK_NEUTRAL+RISK_ON): {summary['vol_below_2pct']}")
+    print(f"  ⚠️ RISK_NEUTRAL threshold (1%) may be too low for this asset universe")
 
     print("\n--- VALIDATION ---")
     delta_ok = summary['max_single_weight_change'] <= DELTA + 0.001
