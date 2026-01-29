@@ -17,8 +17,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 import json
 import os
+import tempfile
 
 from .rebalance_planner import Trade, TradeAction, RebalancePlan
+
+
+# -------------------------------
+# CONSTANTS
+# -------------------------------
+
+MAX_TRADE_HISTORY = 100  # Maximum trades to keep in history
 
 
 # -------------------------------
@@ -234,26 +242,73 @@ class PaperBroker(BrokerAdapter):
             self.trade_history = []
 
     def _load_state(self) -> Optional[dict]:
-        """Load state from file."""
+        """Load and validate state from file."""
         try:
             if os.path.exists(self.state_file):
                 with open(self.state_file, 'r') as f:
-                    return json.load(f)
+                    state = json.load(f)
+
+                # Validate and sanitize state
+                validated = {
+                    'positions': {},
+                    'cash': 0.0,
+                    'trade_history': [],
+                }
+
+                # Validate cash (must be non-negative)
+                cash = state.get('cash', 0.0)
+                if isinstance(cash, (int, float)) and cash >= 0:
+                    validated['cash'] = float(cash)
+
+                # Validate positions (must be non-negative floats)
+                positions = state.get('positions', {})
+                if isinstance(positions, dict):
+                    for asset, value in positions.items():
+                        if isinstance(value, (int, float)) and value >= 0:
+                            validated['positions'][str(asset)] = float(value)
+
+                # Bound trade history
+                history = state.get('trade_history', [])
+                if isinstance(history, list):
+                    validated['trade_history'] = history[-MAX_TRADE_HISTORY:]
+
+                return validated
+        except json.JSONDecodeError:
+            print(f"Warning: Corrupted broker state file, using defaults")
         except Exception as e:
             print(f"Warning: Could not load paper broker state: {e}")
         return None
 
     def _save_state(self):
-        """Save state to file."""
+        """Atomically save state to file."""
+        # Bound trade history before saving
+        self.trade_history = self.trade_history[-MAX_TRADE_HISTORY:]
+
         state = {
             'positions': self.positions,
             'cash': self.cash,
-            'trade_history': self.trade_history[-100:],  # Keep last 100
+            'trade_history': self.trade_history,
             'last_updated': datetime.datetime.now().isoformat(),
         }
+
+        # Atomic write using temp file + rename
         try:
-            with open(self.state_file, 'w') as f:
-                json.dump(state, f, indent=2)
+            dir_path = os.path.dirname(self.state_file) or '.'
+            fd, temp_path = tempfile.mkstemp(
+                dir=dir_path,
+                prefix='.broker_state.',
+                suffix='.tmp'
+            )
+            try:
+                with os.fdopen(fd, 'w') as f:
+                    json.dump(state, f, indent=2)
+                os.replace(temp_path, self.state_file)
+            except Exception:
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
+                raise
         except Exception as e:
             print(f"Warning: Could not save paper broker state: {e}")
 

@@ -96,15 +96,15 @@ class PositionTranslator:
         Raises:
             ValueError: If weights don't sum to 1.0 or contain unknown engines
         """
-        # Validate inputs
-        self._validate_weights(engine_weights)
+        # Validate inputs and normalize weights
+        normalized_weights = self._validate_weights(engine_weights)
         self._validate_equity(account_equity)
 
-        # Calculate dollar positions
+        # Calculate dollar positions using normalized weights
         dollar_positions = {}
         cash_position = 0.0
 
-        for engine, weight in engine_weights.items():
+        for engine, weight in normalized_weights.items():
             asset = self.engine_asset_map.get(engine)
             dollar_amount = account_equity * weight
 
@@ -122,8 +122,12 @@ class PositionTranslator:
             cash_position=cash_position,
         )
 
-    def _validate_weights(self, weights: Dict[str, float]):
-        """Validate engine weights."""
+    def _validate_weights(self, weights: Dict[str, float]) -> Dict[str, float]:
+        """
+        Validate and normalize engine weights.
+
+        Returns normalized weights (sum exactly 1.0) to handle float precision.
+        """
         # Check for unknown engines (CRITICAL - prevents silent expansion)
         unknown_engines = set(weights.keys()) - set(ENGINES)
         if unknown_engines:
@@ -141,14 +145,6 @@ class PositionTranslator:
                 f"All engines must have explicit weights."
             )
 
-        # Check weights sum to 1.0
-        total = sum(weights.values())
-        if abs(total - 1.0) > 0.001:
-            raise ValueError(
-                f"Engine weights must sum to 1.0, got {total:.4f}. "
-                f"Weights: {weights}"
-            )
-
         # Check non-negative weights (no shorting in V1)
         for engine, weight in weights.items():
             if weight < 0:
@@ -156,6 +152,24 @@ class PositionTranslator:
                     f"Negative weight for {engine}: {weight}. "
                     f"V1 does not allow shorting."
                 )
+
+        # Check weights sum to approximately 1.0 (allow 1% tolerance for float issues)
+        total = sum(weights.values())
+        WEIGHT_TOLERANCE = 0.01  # 1% tolerance for float precision
+
+        if abs(total - 1.0) > WEIGHT_TOLERANCE:
+            raise ValueError(
+                f"Engine weights must sum to 1.0 (±1%), got {total:.4f}. "
+                f"Weights: {weights}"
+            )
+
+        # Normalize to exactly 1.0 to handle float precision issues
+        # e.g., 0.12 + 0.50 + 0.20 + 0.18 might not equal exactly 1.0
+        if total != 1.0 and total > 0:
+            normalized = {engine: weight / total for engine, weight in weights.items()}
+            return normalized
+
+        return weights
 
     def _validate_equity(self, equity: float):
         """Validate account equity."""

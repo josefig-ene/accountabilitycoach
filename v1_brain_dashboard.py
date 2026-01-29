@@ -40,6 +40,12 @@ from execution import (
     create_current_positions, translate_brain_output
 )
 
+# Import utilities for safe operations
+from utils import (
+    atomic_write_json, safe_load_json,
+    validate_execution_state, safe_divide, safe_percentage
+)
+
 # -------------------------------
 # PAGE CONFIG
 # -------------------------------
@@ -916,21 +922,20 @@ EXECUTION_STATE_FILE = "execution_state.json"
 
 
 def load_execution_state():
-    """Load execution state from file."""
-    try:
-        with open(EXECUTION_STATE_FILE, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {
-            'last_execution': None,
-            'execution_history': []
-        }
+    """Load and validate execution state from file."""
+    default = {
+        'last_execution': None,
+        'execution_history': [],
+        'last_regime': None,
+        'account_equity': 1_000_000.0,
+    }
+    raw_state = safe_load_json(EXECUTION_STATE_FILE, default)
+    return validate_execution_state(raw_state)
 
 
 def save_execution_state(state):
-    """Save execution state to file."""
-    with open(EXECUTION_STATE_FILE, 'w') as f:
-        json.dump(state, f, indent=2, default=str)
+    """Atomically save execution state to file."""
+    atomic_write_json(EXECUTION_STATE_FILE, state)
 
 
 def get_paper_broker():
@@ -1069,7 +1074,7 @@ def render_execution_page():
         if broker_positions:
             st.write("**Positions:**")
             for asset, value in broker_positions.items():
-                pct = (value / broker_equity * 100) if broker_equity > 0 else 0
+                pct = safe_percentage(value, broker_equity)
                 st.write(f"  • {asset}: ${value:,.0f} ({pct:.1f}%)")
         else:
             st.write("**Positions:** None (100% cash)")
@@ -1083,9 +1088,10 @@ def render_execution_page():
             target = translate_brain_output(brain_output, broker_equity)
 
             for ticker, amount in target.dollar_positions.items():
-                pct = (amount / broker_equity * 100) if broker_equity > 0 else 0
+                pct = safe_percentage(amount, broker_equity)
                 st.write(f"  • {ticker}: ${amount:,.0f} ({pct:.1f}%)")
-            st.write(f"  • CASH: ${target.cash_position:,.0f} ({target.cash_position/broker_equity*100:.1f}%)")
+            cash_pct = safe_percentage(target.cash_position, broker_equity)
+            st.write(f"  • CASH: ${target.cash_position:,.0f} ({cash_pct:.1f}%)")
         except Exception as e:
             st.error(f"Error translating: {e}")
             target = None
@@ -1155,46 +1161,57 @@ def render_execution_page():
         )
 
         if can_execute:
-            st.warning("⚠️ This will execute trades on the Paper Broker. Review the plan above carefully.")
+            # Double-click protection
+            if st.session_state.get('executing', False):
+                st.warning("⏳ Execution in progress... please wait.")
+            else:
+                st.warning("⚠️ This will execute trades on the Paper Broker. Review the plan above carefully.")
 
-            if st.button("🚀 EXECUTE TRADES", type="primary", use_container_width=True):
-                with st.spinner("Executing trades..."):
-                    try:
-                        orchestrator = ExecutionOrchestrator(broker=broker)
-                        result = orchestrator.execute(
-                            brain_output=brain_output,
-                            regime=current_regime,
-                            regime_changed=regime_changed,
-                        )
+                if st.button("🚀 EXECUTE TRADES", type="primary", use_container_width=True):
+                    # Set lock to prevent double-click
+                    st.session_state.executing = True
 
-                        # Save execution state
-                        exec_state = load_execution_state()
-                        exec_state['last_regime'] = current_regime
-                        exec_state['last_execution'] = result.to_dict()
-                        exec_state['execution_history'].append({
-                            'timestamp': datetime.datetime.now().isoformat(),
-                            'regime': current_regime,
-                            'success': result.success,
-                            'trades': len(result.rebalance_plan.trades) if result.rebalance_plan else 0,
-                            'message': result.message
-                        })
-                        exec_state['execution_history'] = exec_state['execution_history'][-50:]
-                        save_execution_state(exec_state)
+                    with st.spinner("Executing trades..."):
+                        try:
+                            orchestrator = ExecutionOrchestrator(broker=broker)
+                            result = orchestrator.execute(
+                                brain_output=brain_output,
+                                regime=current_regime,
+                                regime_changed=regime_changed,
+                            )
 
-                        if result.success:
-                            st.success(f"✅ {result.message}")
-                            add_alert(f"Execution complete: {result.message}", "info")
-                        else:
-                            st.error(f"❌ {result.message}")
-                            if result.error:
-                                st.write(f"Error: {result.error}")
-                            add_alert(f"Execution failed: {result.message}", "error")
+                            # Save execution state
+                            exec_state = load_execution_state()
+                            exec_state['last_regime'] = current_regime
+                            exec_state['last_execution'] = result.to_dict()
+                            exec_state['execution_history'].append({
+                                'timestamp': datetime.datetime.now().isoformat(),
+                                'regime': current_regime,
+                                'success': result.success,
+                                'trades': len(result.rebalance_plan.trades) if result.rebalance_plan else 0,
+                                'message': result.message
+                            })
+                            exec_state['execution_history'] = exec_state['execution_history'][-50:]
+                            save_execution_state(exec_state)
+
+                            if result.success:
+                                st.success(f"✅ {result.message}")
+                                add_alert(f"Execution complete: {result.message}", "info")
+                            else:
+                                st.error(f"❌ {result.message}")
+                                if result.error:
+                                    st.write(f"Error: {result.error}")
+                                add_alert(f"Execution failed: {result.message}", "error")
+
+                        except Exception as e:
+                            st.error(f"Execution error: {e}")
+                            add_alert(f"Execution error: {e}", "error")
+
+                        finally:
+                            # Release lock
+                            st.session_state.executing = False
 
                         st.rerun()
-
-                    except Exception as e:
-                        st.error(f"Execution error: {e}")
-                        add_alert(f"Execution error: {e}", "error")
         else:
             if plan and plan.halt_reason:
                 st.error("Cannot execute - plan halted due to guardrail violation")

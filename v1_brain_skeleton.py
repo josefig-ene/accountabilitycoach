@@ -24,6 +24,11 @@ from execution_config import (
     validate_engine_weights, brain_output_to_orders
 )
 
+# Import utilities for safe operations
+from utils import (
+    atomic_write_json, safe_load_json, validate_brain_state
+)
+
 # -------------------------------
 # CONFIG / FIXED PARAMETERS
 # -------------------------------
@@ -97,33 +102,31 @@ def fetch_data(assets, start, end):
 # -------------------------------
 
 def load_state():
-    """Load the brain state from file, or return default state."""
-    try:
-        with open(STATE_FILE, 'r') as f:
-            state = json.load(f)
-            # Migrate old state format if needed
-            if 'engine_weights' not in state:
-                state['engine_weights'] = {e: 0.0 for e in ENGINES}
-                state['engine_weights']['CASH'] = 1.0
-            return state
-    except FileNotFoundError:
-        # Default state: 100% cash
-        return {
-            "last_regime": None,
-            "last_allocation_date": None,
-            "engine_weights": {
-                "CASH": 1.0,
-                "EQUITY": 0.0,
-                "DEFENSIVE": 0.0,
-                "REAL_ASSET": 0.0,
-            }
+    """Load and validate the brain state from file, or return default state."""
+    default = {
+        "last_regime": None,
+        "last_allocation_date": None,
+        "engine_weights": {
+            "CASH": 1.0,
+            "EQUITY": 0.0,
+            "DEFENSIVE": 0.0,
+            "REAL_ASSET": 0.0,
         }
+    }
+    raw_state = safe_load_json(STATE_FILE, default)
+
+    # Migrate old state format if needed
+    if 'engine_weights' not in raw_state:
+        raw_state['engine_weights'] = {e: 0.0 for e in ENGINES}
+        raw_state['engine_weights']['CASH'] = 1.0
+
+    # Validate and sanitize state
+    return validate_brain_state(raw_state)
 
 
 def save_state(state):
-    """Save the brain state to file."""
-    with open(STATE_FILE, 'w') as f:
-        json.dump(state, f, indent=2)
+    """Atomically save the brain state to file."""
+    atomic_write_json(STATE_FILE, state)
 
 
 # -------------------------------
