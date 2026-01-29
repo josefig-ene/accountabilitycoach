@@ -1004,14 +1004,58 @@ def render_execution_page():
             )
 
     # -------------------------------
+    # ACCOUNT EQUITY INPUT
+    # -------------------------------
+
+    st.markdown("---")
+    st.header("Account Setup")
+
+    col_equity, col_apply = st.columns([3, 1])
+
+    with col_equity:
+        # Load saved equity or use default
+        exec_state = load_execution_state()
+        saved_equity = exec_state.get('account_equity', 1_000_000.0)
+
+        account_equity = st.number_input(
+            "Your Account Equity ($)",
+            min_value=1000.0,
+            max_value=100_000_000.0,
+            value=float(saved_equity),
+            step=10000.0,
+            format="%.0f",
+            help="Enter your total account value. This determines position sizes."
+        )
+
+    with col_apply:
+        st.write("")  # Spacing
+        if st.button("💰 Apply & Reset Broker", use_container_width=True):
+            # Save equity to state
+            exec_state = load_execution_state()
+            exec_state['account_equity'] = account_equity
+            save_execution_state(exec_state)
+
+            # Reset broker with new equity
+            broker.reset(initial_cash=account_equity)
+            st.success(f"Broker reset to ${account_equity:,.0f}")
+            st.rerun()
+
+    # Show current broker vs input mismatch warning
+    if abs(broker.get_equity() - account_equity) > 100:
+        st.warning(
+            f"⚠️ Broker equity (${broker.get_equity():,.0f}) differs from input (${account_equity:,.0f}). "
+            f"Click 'Apply & Reset Broker' to sync."
+        )
+
+    # -------------------------------
     # STEP 2: EXECUTION PREVIEW
     # -------------------------------
 
     st.markdown("---")
     st.header("Step 2: Execution Preview")
 
-    # Get broker state
-    broker_equity = broker.get_equity()
+    # Use user-specified equity for calculations
+    broker_equity = account_equity
     broker_cash = broker.get_cash()
     broker_positions = broker.get_positions()
 
@@ -1163,8 +1207,8 @@ def render_execution_page():
         st.write("")  # Spacing
         st.write("")
         if st.button("🔄 Reset Broker", use_container_width=True):
-            broker.reset(initial_cash=1_000_000.0)
-            st.success("Broker reset to $1M cash")
+            broker.reset(initial_cash=account_equity)
+            st.success(f"Broker reset to ${account_equity:,.0f} cash")
             st.rerun()
 
     # -------------------------------
