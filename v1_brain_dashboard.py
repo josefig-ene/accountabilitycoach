@@ -17,7 +17,7 @@ from pathlib import Path
 
 # Import from V1 Brain Skeleton
 from v1_brain_skeleton import (
-    ASSETS, START_DATE, END_DATE, DELTA, ALPHA, COOLDOWN_WEEKS, STATE_FILE,
+    SENSING_ASSETS, ASSETS, START_DATE, END_DATE, DELTA, ALPHA, COOLDOWN_WEEKS, STATE_FILE,
     fetch_data, load_state, save_state, detect_regime, allocate_capital
 )
 
@@ -25,6 +25,12 @@ from v1_brain_skeleton import (
 from v1_backtest import (
     run_backtest, calculate_summary, print_summary_report,
     get_regime_history, get_weight_history, get_exposure_history
+)
+
+# Import engine configuration
+from execution_config import (
+    ENGINES, ENGINE_ASSET_MAP, REGIME_ENGINE_TARGETS,
+    brain_output_to_orders
 )
 
 # -------------------------------
@@ -39,10 +45,11 @@ st.set_page_config(
 )
 
 # -------------------------------
-# ASSET NAME MAPPING
+# NAME MAPPINGS
 # -------------------------------
 
-ASSET_NAMES = {
+# Sensing assets (for regime detection display)
+SENSING_ASSET_NAMES = {
     '^GSPC': 'S&P 500',
     '^IXIC': 'Nasdaq',
     '^RUT': 'Russell 2000',
@@ -54,6 +61,25 @@ ASSET_NAMES = {
     'DBC': 'Commodities',
     'DX-Y.NYB': 'Dollar Index',
     '^VIX': 'VIX'
+}
+
+# Legacy alias
+ASSET_NAMES = SENSING_ASSET_NAMES
+
+# Engine names (for allocation display)
+ENGINE_NAMES = {
+    'CASH': 'Cash',
+    'EQUITY': 'Equity (SPY)',
+    'DEFENSIVE': 'Defensive (TLT)',
+    'REAL_ASSET': 'Real Asset (GLD)'
+}
+
+# Engine colors for charts
+ENGINE_COLORS = {
+    'CASH': '#2ecc71',        # Green
+    'EQUITY': '#3498db',      # Blue
+    'DEFENSIVE': '#9b59b6',   # Purple
+    'REAL_ASSET': '#f1c40f',  # Gold
 }
 
 # -------------------------------
@@ -259,11 +285,12 @@ def render_dashboard():
         st.metric("Avg Volatility (4wk)", f"{current_vol:.2f}%")
 
     with col3:
-        cash_weight = state.get('cash_weight', 1.0)
+        engine_weights = state.get('engine_weights', {'CASH': 1.0})
+        cash_weight = engine_weights.get('CASH', 1.0)
         st.metric("Cash Weight", f"{cash_weight:.1%}")
 
     with col4:
-        total_invested = sum(state.get('weights', {}).values())
+        total_invested = 1.0 - cash_weight
         st.metric("Total Invested", f"{total_invested:.1%}")
 
     st.markdown("---")
@@ -332,29 +359,30 @@ def render_dashboard():
     st.markdown("---")
 
     # -------------------------------
-    # CHARTS ROW 2: Allocation
+    # CHARTS ROW 2: Engine Allocation
     # -------------------------------
 
     col_pie, col_bar = st.columns(2)
 
     with col_pie:
-        st.subheader("🥧 Current Allocation")
+        st.subheader("🥧 Engine Allocation")
 
-        weights = state.get('weights', {})
-        cash = state.get('cash_weight', 1.0)
+        engine_weights = state.get('engine_weights', {'CASH': 1.0})
 
-        # Build allocation data
-        labels = [ASSET_NAMES.get(a, a) for a in weights.keys()] + ['Cash']
-        values = list(weights.values()) + [cash]
+        # Build allocation data with engine names
+        labels = [ENGINE_NAMES.get(e, e) for e in engine_weights.keys()]
+        values = list(engine_weights.values())
+        colors = [ENGINE_COLORS.get(e, '#888') for e in engine_weights.keys()]
 
         # Filter out zero weights for cleaner pie
-        filtered_data = [(l, v) for l, v in zip(labels, values) if v > 0.001]
+        filtered_data = [(l, v, c) for l, v, c in zip(labels, values, colors) if v > 0.001]
         if filtered_data:
-            labels, values = zip(*filtered_data)
+            labels, values, colors = zip(*filtered_data)
 
         fig_pie = go.Figure(data=[go.Pie(
             labels=labels,
             values=values,
+            marker_colors=colors,
             hole=0.4,
             textinfo='label+percent',
             textposition='outside'
@@ -368,22 +396,25 @@ def render_dashboard():
         st.plotly_chart(fig_pie, use_container_width=True)
 
     with col_bar:
-        st.subheader("📊 Asset Weights")
+        st.subheader("📊 Engine Weights")
 
-        weights = state.get('weights', {})
+        engine_weights = state.get('engine_weights', {})
 
         # Create bar chart data
         bar_data = pd.DataFrame({
-            'Asset': [ASSET_NAMES.get(a, a) for a in weights.keys()],
-            'Weight': [v * 100 for v in weights.values()]
+            'Engine': [ENGINE_NAMES.get(e, e) for e in engine_weights.keys()],
+            'Weight': [v * 100 for v in engine_weights.values()],
+            'Asset': [ENGINE_ASSET_MAP.get(e, 'N/A') for e in engine_weights.keys()]
         })
         bar_data = bar_data.sort_values('Weight', ascending=True)
 
         fig_bar = go.Figure(go.Bar(
             x=bar_data['Weight'],
-            y=bar_data['Asset'],
+            y=bar_data['Engine'],
             orientation='h',
-            marker_color='steelblue'
+            marker_color=[ENGINE_COLORS.get(e.split()[0].upper(), '#888') for e in bar_data['Engine']],
+            text=bar_data['Asset'],
+            textposition='inside'
         ))
 
         fig_bar.update_layout(
@@ -400,14 +431,15 @@ def render_dashboard():
     # REGIME TARGET WEIGHTS TABLE
     # -------------------------------
 
-    st.subheader("📋 Regime Target Weights")
+    st.subheader("📋 Engine Allocation by Regime")
 
     regime_table = pd.DataFrame({
         'Regime': ['RISK_ON', 'RISK_NEUTRAL', 'RISK_OFF'],
-        'Per-Asset Weight': ['8%', '5%', '0%'],
-        'Total Asset Weight': ['88%', '55%', '0%'],
-        'Cash Weight': ['12%', '45%', '100%'],
-        'Description': [
+        'EQUITY (SPY)': ['50%', '25%', '0%'],
+        'DEFENSIVE (TLT)': ['20%', '15%', '0%'],
+        'REAL_ASSET (GLD)': ['18%', '15%', '0%'],
+        'CASH': ['12%', '45%', '100%'],
+        'Meaning': [
             'Environment permits directional risk-taking',
             'Noise dominates - defensive posture',
             'Capital preservation priority'

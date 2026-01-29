@@ -2,6 +2,11 @@
 V1 Brain Historical Backtest Loop
 Purpose: Validate allocator logic across historical data (1997-present)
 
+ARCHITECTURE:
+- Uses SENSING_ASSETS (11 assets) for regime detection
+- Allocates to ENGINES (4: CASH, EQUITY, DEFENSIVE, REAL_ASSET)
+- Engines map to assets via execution_config
+
 This backtest does NOT optimize parameters.
 It validates that δ, α, and cooldown behave as intended.
 """
@@ -13,15 +18,20 @@ from copy import deepcopy
 
 # Import frozen V1 parameters and functions
 from v1_brain_skeleton import (
-    ASSETS, START_DATE, DELTA, ALPHA, COOLDOWN_WEEKS,
+    SENSING_ASSETS, ASSETS, START_DATE, DELTA, ALPHA, COOLDOWN_WEEKS,
     fetch_data
 )
 
+# Import engine configuration
+from execution_config import (
+    ENGINES, REGIME_ENGINE_TARGETS, ENGINE_ASSET_MAP
+)
+
 # -------------------------------
-# ASSET NAME MAPPING
+# SENSING ASSET NAME MAPPING (for display)
 # -------------------------------
 
-ASSET_NAMES = {
+SENSING_ASSET_NAMES = {
     '^GSPC': 'S&P 500',
     '^IXIC': 'Nasdaq',
     '^RUT': 'Russell 2000',
@@ -33,6 +43,17 @@ ASSET_NAMES = {
     'DBC': 'Commodities',
     'DX-Y.NYB': 'Dollar Index',
     '^VIX': 'VIX'
+}
+
+# Legacy alias
+ASSET_NAMES = SENSING_ASSET_NAMES
+
+# Engine display names
+ENGINE_NAMES = {
+    'CASH': 'Cash',
+    'EQUITY': 'Equity (SPY)',
+    'DEFENSIVE': 'Defensive (TLT)',
+    'REAL_ASSET': 'Real Asset (GLD)'
 }
 
 
@@ -74,6 +95,7 @@ def detect_regime_at_point(price_df, idx, lookback=4):
 def allocate_at_point(state, new_regime, current_date):
     """
     Apply V1 allocation rules at a specific point in time.
+    Allocates to ENGINES, not individual assets.
     Uses exact same logic as v1_brain_skeleton.py
     """
     # Reset flags at start of each call
@@ -95,41 +117,20 @@ def allocate_at_point(state, new_regime, current_date):
 
     state['regime_changed'] = True
 
-    # Target weights per regime (regime = permission level, not signal)
-    if new_regime == "RISK_ON":
-        # Environment permits directional risk-taking
-        target_weights = {a: 0.08 for a in ASSETS}
-        cash_target = 0.12
-    elif new_regime == "RISK_NEUTRAL":
-        # Noise dominates, defensive posture
-        target_weights = {a: 0.05 for a in ASSETS}
-        cash_target = 0.45
-    elif new_regime == "RISK_OFF":
-        # Capital preservation priority
-        target_weights = {a: 0.0 for a in ASSETS}
-        cash_target = 1.0
-    else:
-        target_weights = {a: 0.0 for a in ASSETS}
-        cash_target = 1.0
+    # Get target engine weights from execution_config (frozen V1 targets)
+    target_weights = REGIME_ENGINE_TARGETS.get(new_regime, REGIME_ENGINE_TARGETS["RISK_OFF"])
 
     # Track weight changes for this step
     weight_changes = {}
 
-    # Apply ramp (alpha) and cap (delta)
-    for a in ASSETS:
-        w_current = state['weights'].get(a, 0.0)
-        w_target = target_weights[a]
+    # Apply ramp (alpha) and cap (delta) to each ENGINE
+    for engine in ENGINES:
+        w_current = state['engine_weights'].get(engine, 0.0)
+        w_target = target_weights[engine]
         w_new = w_current + ALPHA * (w_target - w_current)
         w_change = max(min(w_new - w_current, DELTA), -DELTA)
-        state['weights'][a] = w_current + w_change
-        weight_changes[a] = w_change
-
-    # Cash weight
-    w_cash_current = state['cash_weight']
-    w_cash_new = w_cash_current + ALPHA * (cash_target - w_cash_current)
-    w_cash_change = max(min(w_cash_new - w_cash_current, DELTA), -DELTA)
-    state['cash_weight'] = w_cash_current + w_cash_change
-    weight_changes['cash'] = w_cash_change
+        state['engine_weights'][engine] = w_current + w_change
+        weight_changes[engine] = w_change
 
     # Update state
     state['last_regime'] = new_regime
@@ -158,18 +159,23 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
     """
     if price_df is None:
         print("Fetching historical data...")
-        price_df = fetch_data(ASSETS, START_DATE, datetime.date.today().isoformat())
+        price_df = fetch_data(SENSING_ASSETS, START_DATE, datetime.date.today().isoformat())
 
     print(f"Running backtest on {len(price_df)} weeks of data...")
     print(f"Date range: {price_df.index[0].date()} to {price_df.index[-1].date()}")
-    print(f"Assets: {len(price_df.columns)}")
+    print(f"Sensing assets: {len(price_df.columns)}")
+    print(f"Allocation engines: {len(ENGINES)} (CASH, EQUITY, DEFENSIVE, REAL_ASSET)")
 
-    # Initialize state
+    # Initialize state with ENGINE weights (not individual asset weights)
     state = {
         "last_regime": None,
         "last_allocation_date": None,
-        "weights": {a: 0.0 for a in ASSETS},
-        "cash_weight": 1.0,
+        "engine_weights": {
+            "CASH": 1.0,
+            "EQUITY": 0.0,
+            "DEFENSIVE": 0.0,
+            "REAL_ASSET": 0.0,
+        },
         "cooldown_active": False,
         "regime_changed": False,
         "weight_changes": {}
@@ -189,8 +195,7 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
 
         # Store pre-allocation state for comparison
         old_regime = state['last_regime']
-        old_weights = deepcopy(state['weights'])
-        old_cash = state['cash_weight']
+        old_weights = deepcopy(state['engine_weights'])
 
         # Apply allocation rules
         state = allocate_at_point(state, detected_regime, current_date)
@@ -200,7 +205,8 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
         effective_regime = state['last_regime'] if state['last_regime'] else detected_regime
 
         # Calculate metrics for this week
-        total_invested = sum(state['weights'].values())
+        cash_weight = state['engine_weights']['CASH']
+        total_invested = 1.0 - cash_weight
         max_weight_change = 0
         if state.get('weight_changes'):
             max_weight_change = max(abs(v) for v in state['weight_changes'].values())
@@ -213,19 +219,19 @@ def run_backtest(price_df=None, start_idx=52, verbose=False):
             'volatility': vol_value,                 # Raw volatility value for diagnostics
             'regime_changed': state.get('regime_changed', False),
             'cooldown_active': state.get('cooldown_active', False),
-            'cash_weight': state['cash_weight'],
+            'cash_weight': cash_weight,
             'total_invested': total_invested,
             'max_weight_change': max_weight_change,
         }
 
-        # Add individual asset weights
-        for a in ASSETS:
-            result[f'weight_{a}'] = state['weights'].get(a, 0.0)
+        # Add engine weights
+        for engine in ENGINES:
+            result[f'weight_{engine}'] = state['engine_weights'].get(engine, 0.0)
 
         results.append(result)
 
         if verbose and idx % 100 == 0:
-            print(f"  Week {idx}: {current_date} | Regime: {regime} | Cash: {state['cash_weight']:.1%}")
+            print(f"  Week {idx}: {current_date} | Regime: {detected_regime} | Cash: {cash_weight:.1%}")
 
     # Convert to DataFrame
     results_df = pd.DataFrame(results)
@@ -413,11 +419,11 @@ def get_regime_history(results_df):
 
 
 def get_weight_history(results_df):
-    """Extract weight history for plotting."""
+    """Extract engine weight history for plotting."""
     weight_cols = [c for c in results_df.columns if c.startswith('weight_')]
-    df = results_df[weight_cols + ['cash_weight']].copy()
-    # Rename columns to friendly names
-    df.columns = [ASSET_NAMES.get(c.replace('weight_', ''), c) for c in weight_cols] + ['Cash']
+    df = results_df[weight_cols].copy()
+    # Rename columns to friendly engine names
+    df.columns = [ENGINE_NAMES.get(c.replace('weight_', ''), c.replace('weight_', '')) for c in weight_cols]
     return df
 
 

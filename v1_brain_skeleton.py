@@ -3,6 +3,10 @@ Minimal V1 Brain Skeleton - Updated Universe
 Author: V1 Blueprint
 Purpose: Regime detection + capital allocation (paper) + alerts
 
+ARCHITECTURE:
+- SENSING: 11 assets for regime detection (broad market view)
+- ALLOCATION: 4 engines for capital deployment (SPY, TLT, GLD, Cash)
+
 This is a frozen V1 allocator brain.
 Do NOT optimize parameters.
 Do NOT add indicators.
@@ -14,18 +18,25 @@ import pandas as pd
 import json
 import datetime
 
+# Import engine configuration
+from execution_config import (
+    ENGINES, REGIME_ENGINE_TARGETS, ENGINE_ASSET_MAP,
+    validate_engine_weights, brain_output_to_orders
+)
+
 # -------------------------------
 # CONFIG / FIXED PARAMETERS
 # -------------------------------
 
-# Updated asset universe (Yahoo-friendly)
-ASSETS = [
+# SENSING UNIVERSE: 11 assets for regime detection (Yahoo-friendly)
+# These are used to SENSE the market environment, not for allocation
+SENSING_ASSETS = [
     '^GSPC',    # S&P 500
     '^IXIC',    # Nasdaq
     '^RUT',     # Russell 2000
     'EFA',      # MSCI EAFE proxy
     'EEM',      # Emerging markets
-    '^TNX',     # 10Y Treasury
+    '^TNX',     # 10Y Treasury yield
     'TLT',      # Long bonds ETF
     'GLD',      # Gold
     'DBC',      # Commodities
@@ -33,13 +44,16 @@ ASSETS = [
     '^VIX'      # Volatility
 ]
 
+# Legacy alias for backwards compatibility
+ASSETS = SENSING_ASSETS
+
 START_DATE = '1997-01-01'
 END_DATE = datetime.date.today().isoformat()
 
 # V1 Allocator parameters (frozen)
-DELTA = 0.15          # max weight change
-ALPHA = 0.33          # ramp fraction
-COOLDOWN_WEEKS = 3
+DELTA = 0.15          # max weight change per rebalance
+ALPHA = 0.33          # ramp fraction (gradual transition)
+COOLDOWN_WEEKS = 3    # minimum weeks between allocation changes
 
 STATE_FILE = "v1_brain_state.json"
 
@@ -86,13 +100,23 @@ def load_state():
     """Load the brain state from file, or return default state."""
     try:
         with open(STATE_FILE, 'r') as f:
-            return json.load(f)
+            state = json.load(f)
+            # Migrate old state format if needed
+            if 'engine_weights' not in state:
+                state['engine_weights'] = {e: 0.0 for e in ENGINES}
+                state['engine_weights']['CASH'] = 1.0
+            return state
     except FileNotFoundError:
+        # Default state: 100% cash
         return {
             "last_regime": None,
             "last_allocation_date": None,
-            "weights": {a: 0.0 for a in ASSETS},
-            "cash_weight": 1.0
+            "engine_weights": {
+                "CASH": 1.0,
+                "EQUITY": 0.0,
+                "DEFENSIVE": 0.0,
+                "REAL_ASSET": 0.0,
+            }
         }
 
 
@@ -133,7 +157,10 @@ def detect_regime(price_df):
 
 def allocate_capital(state, new_regime):
     """
-    Allocate capital based on detected regime.
+    Allocate capital to ENGINES based on detected regime.
+
+    The brain outputs engine weights (CASH, EQUITY, DEFENSIVE, REAL_ASSET).
+    The execution layer maps engines to assets (SPY, TLT, GLD, Cash).
 
     Rules:
     - Respects cooldown period between allocations
@@ -152,38 +179,16 @@ def allocate_capital(state, new_regime):
     if new_regime == state['last_regime']:
         return state  # no regime change
 
-    # Target weights per regime (regime = permission level, not signal)
-    target_weights = {}
-    if new_regime == "RISK_ON":
-        # Environment permits directional risk-taking
-        target_weights = {a: 0.08 for a in ASSETS}  # spread exposure (sum ~88%)
-        cash_target = 0.12
-    elif new_regime == "RISK_NEUTRAL":
-        # Noise dominates, defensive posture
-        target_weights = {a: 0.05 for a in ASSETS}  # light exposure
-        cash_target = 0.45
-    elif new_regime == "RISK_OFF":
-        # Capital preservation priority
-        target_weights = {a: 0.0 for a in ASSETS}   # de-risk
-        cash_target = 1.0
-    else:
-        # Default fallback
-        target_weights = {a: 0.0 for a in ASSETS}
-        cash_target = 1.0
+    # Get target engine weights from execution_config (frozen V1 targets)
+    target_weights = REGIME_ENGINE_TARGETS.get(new_regime, REGIME_ENGINE_TARGETS["RISK_OFF"])
 
-    # Apply ramp (alpha) and cap (delta)
-    for a in ASSETS:
-        w_current = state['weights'].get(a, 0.0)
-        w_target = target_weights[a]
+    # Apply ramp (alpha) and cap (delta) to each engine
+    for engine in ENGINES:
+        w_current = state['engine_weights'].get(engine, 0.0)
+        w_target = target_weights[engine]
         w_new = w_current + ALPHA * (w_target - w_current)
         w_change = max(min(w_new - w_current, DELTA), -DELTA)
-        state['weights'][a] = w_current + w_change
-
-    # Cash weight
-    w_cash_current = state['cash_weight']
-    w_cash_new = w_cash_current + ALPHA * (cash_target - w_cash_current)
-    w_cash_change = max(min(w_cash_new - w_cash_current, DELTA), -DELTA)
-    state['cash_weight'] = w_cash_current + w_cash_change
+        state['engine_weights'][engine] = w_current + w_change
 
     # Update state
     state['last_regime'] = new_regime
@@ -197,10 +202,19 @@ def allocate_capital(state, new_regime):
 # -------------------------------
 
 def push_alert(state):
-    """Print current regime and allocation state."""
-    print(f"[ALERT] Regime: {state['last_regime']}")
-    print(f"        Weights: {state['weights']}")
-    print(f"        Cash: {state['cash_weight']:.2f}")
+    """Print current regime and engine allocation state."""
+    print(f"\n[ALERT] Regime: {state['last_regime']}")
+    print(f"        Engine Weights:")
+    for engine, weight in state['engine_weights'].items():
+        asset = ENGINE_ASSET_MAP.get(engine, "N/A")
+        print(f"          {engine:12} → {str(asset):6}: {weight:6.1%}")
+
+    # Show executable orders
+    orders = brain_output_to_orders(state['engine_weights'])
+    print(f"\n        Executable Orders:")
+    for ticker, weight in orders.items():
+        if ticker and weight > 0:
+            print(f"          {ticker}: {weight:.1%}")
 
 
 # -------------------------------
