@@ -33,6 +33,13 @@ from execution_config import (
     brain_output_to_orders
 )
 
+# Import execution layer
+from execution import (
+    ExecutionOrchestrator, PaperBroker, ExecutionResult,
+    PositionTranslator, RebalancePlanner,
+    create_current_positions, translate_brain_output
+)
+
 # -------------------------------
 # PAGE CONFIG
 # -------------------------------
@@ -902,15 +909,325 @@ def render_backtest_page():
 
 
 # -------------------------------
+# EXECUTION PAGE
+# -------------------------------
+
+EXECUTION_STATE_FILE = "execution_state.json"
+
+
+def load_execution_state():
+    """Load execution state from file."""
+    try:
+        with open(EXECUTION_STATE_FILE, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {
+            'last_execution': None,
+            'execution_history': []
+        }
+
+
+def save_execution_state(state):
+    """Save execution state to file."""
+    with open(EXECUTION_STATE_FILE, 'w') as f:
+        json.dump(state, f, indent=2, default=str)
+
+
+def get_paper_broker():
+    """Get or create paper broker instance."""
+    if 'paper_broker' not in st.session_state:
+        st.session_state.paper_broker = PaperBroker(
+            initial_cash=1_000_000.0,
+            state_file="paper_broker_state.json"
+        )
+    return st.session_state.paper_broker
+
+
+def render_execution_page():
+    """Render the execution layer page."""
+    st.title("🚀 Execution Layer")
+    st.caption("Translate brain decisions into trades")
+
+    st.info("💡 **Flow:** Brain decides → You review → You execute")
+
+    # Load brain state
+    brain_state = load_state()
+    broker = get_paper_broker()
+
+    # -------------------------------
+    # STEP 1: BRAIN OUTPUT
+    # -------------------------------
+
+    st.markdown("---")
+    st.header("Step 1: Brain Decision")
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        current_regime = brain_state.get('last_regime', 'Unknown')
+        regime_color = REGIME_COLORS.get(current_regime, '#888888')
+
+        st.markdown(
+            f"<div style='background-color:{regime_color};padding:15px;border-radius:10px;'>"
+            f"<p style='color:white;margin:0;font-size:14px;'>Current Regime</p>"
+            f"<p style='color:white;margin:0;font-size:32px;font-weight:bold;'>{current_regime or 'Not Set'}</p>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+        if brain_state.get('last_allocation_date'):
+            st.caption(f"Last allocation: {brain_state['last_allocation_date']}")
+
+    with col2:
+        if st.button("🧠 Run Brain Now", use_container_width=True, key="exec_run_brain"):
+            with st.spinner("Running V1 Brain..."):
+                run_brain_and_update()
+            st.rerun()
+
+    # Show engine weights from brain
+    st.subheader("Brain Output: Engine Weights")
+
+    engine_weights = brain_state.get('engine_weights', {'CASH': 1.0})
+
+    weight_cols = st.columns(4)
+    for i, (engine, weight) in enumerate(engine_weights.items()):
+        with weight_cols[i]:
+            asset = ENGINE_ASSET_MAP.get(engine, 'N/A')
+            color = ENGINE_COLORS.get(engine, '#888')
+            st.markdown(
+                f"<div style='background-color:{color};padding:10px;border-radius:5px;text-align:center;'>"
+                f"<p style='color:white;margin:0;font-size:12px;'>{ENGINE_NAMES.get(engine, engine)}</p>"
+                f"<p style='color:white;margin:0;font-size:24px;font-weight:bold;'>{weight:.1%}</p>"
+                f"<p style='color:white;margin:0;font-size:10px;'>→ {asset or 'Cash'}</p>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+    # -------------------------------
+    # STEP 2: EXECUTION PREVIEW
+    # -------------------------------
+
+    st.markdown("---")
+    st.header("Step 2: Execution Preview")
+
+    # Get broker state
+    broker_equity = broker.get_equity()
+    broker_cash = broker.get_cash()
+    broker_positions = broker.get_positions()
+
+    col_broker, col_target = st.columns(2)
+
+    with col_broker:
+        st.subheader("📊 Current Broker State")
+        st.metric("Total Equity", f"${broker_equity:,.0f}")
+        st.metric("Cash", f"${broker_cash:,.0f}")
+
+        if broker_positions:
+            st.write("**Positions:**")
+            for asset, value in broker_positions.items():
+                pct = (value / broker_equity * 100) if broker_equity > 0 else 0
+                st.write(f"  • {asset}: ${value:,.0f} ({pct:.1f}%)")
+        else:
+            st.write("**Positions:** None (100% cash)")
+
+    with col_target:
+        st.subheader("🎯 Target Positions")
+
+        # Translate brain output to target positions
+        brain_output = {"engine_weights": engine_weights}
+        try:
+            target = translate_brain_output(brain_output, broker_equity)
+
+            for ticker, amount in target.dollar_positions.items():
+                pct = (amount / broker_equity * 100) if broker_equity > 0 else 0
+                st.write(f"  • {ticker}: ${amount:,.0f} ({pct:.1f}%)")
+            st.write(f"  • CASH: ${target.cash_position:,.0f} ({target.cash_position/broker_equity*100:.1f}%)")
+        except Exception as e:
+            st.error(f"Error translating: {e}")
+            target = None
+
+    # Plan the rebalance
+    st.subheader("📋 Rebalance Plan")
+
+    if target:
+        try:
+            planner = RebalancePlanner()
+            current = create_current_positions(broker_positions, broker_cash)
+
+            # Determine if regime changed
+            exec_state = load_execution_state()
+            last_regime = exec_state.get('last_regime')
+            regime_changed = (current_regime != last_regime) and (last_regime is not None)
+
+            plan = planner.plan(target, current, regime_changed=regime_changed)
+
+            # Display plan status
+            if plan.halt_reason:
+                st.error(f"🛑 **HALT:** {plan.halt_reason.value}")
+                st.write(f"Reason: {plan.halt_message}")
+            elif not plan.should_execute:
+                st.success("✅ **No trades needed** - positions within tolerance")
+            else:
+                st.warning(f"⚠️ **{len(plan.trades)} trade(s) required**")
+
+                # Show trades
+                trade_data = []
+                for trade in plan.trades:
+                    trade_data.append({
+                        'Action': trade.action.value,
+                        'Asset': trade.asset,
+                        'Amount': f"${trade.amount:,.0f}",
+                        'Reason': trade.reason
+                    })
+
+                if trade_data:
+                    st.dataframe(pd.DataFrame(trade_data), use_container_width=True, hide_index=True)
+
+                st.write(f"**Total Buy:** ${plan.total_buy_amount:,.0f}")
+                st.write(f"**Total Sell:** ${plan.total_sell_amount:,.0f}")
+
+        except Exception as e:
+            st.error(f"Error planning: {e}")
+            plan = None
+    else:
+        plan = None
+
+    # -------------------------------
+    # STEP 3: EXECUTE
+    # -------------------------------
+
+    st.markdown("---")
+    st.header("Step 3: Execute")
+
+    col_exec, col_reset = st.columns([3, 1])
+
+    with col_exec:
+        # Only show execute button if there are trades to make
+        can_execute = (
+            plan is not None and
+            plan.should_execute and
+            not plan.halt_reason and
+            len(plan.trades) > 0
+        )
+
+        if can_execute:
+            st.warning("⚠️ This will execute trades on the Paper Broker. Review the plan above carefully.")
+
+            if st.button("🚀 EXECUTE TRADES", type="primary", use_container_width=True):
+                with st.spinner("Executing trades..."):
+                    try:
+                        orchestrator = ExecutionOrchestrator(broker=broker)
+                        result = orchestrator.execute(
+                            brain_output=brain_output,
+                            regime=current_regime,
+                            regime_changed=regime_changed,
+                        )
+
+                        # Save execution state
+                        exec_state = load_execution_state()
+                        exec_state['last_regime'] = current_regime
+                        exec_state['last_execution'] = result.to_dict()
+                        exec_state['execution_history'].append({
+                            'timestamp': datetime.datetime.now().isoformat(),
+                            'regime': current_regime,
+                            'success': result.success,
+                            'trades': len(result.rebalance_plan.trades) if result.rebalance_plan else 0,
+                            'message': result.message
+                        })
+                        exec_state['execution_history'] = exec_state['execution_history'][-50:]
+                        save_execution_state(exec_state)
+
+                        if result.success:
+                            st.success(f"✅ {result.message}")
+                            add_alert(f"Execution complete: {result.message}", "info")
+                        else:
+                            st.error(f"❌ {result.message}")
+                            if result.error:
+                                st.write(f"Error: {result.error}")
+                            add_alert(f"Execution failed: {result.message}", "error")
+
+                        st.rerun()
+
+                    except Exception as e:
+                        st.error(f"Execution error: {e}")
+                        add_alert(f"Execution error: {e}", "error")
+        else:
+            if plan and plan.halt_reason:
+                st.error("Cannot execute - plan halted due to guardrail violation")
+            elif plan and not plan.should_execute:
+                st.info("No execution needed - positions are within tolerance")
+            else:
+                st.info("Run the brain first to generate an allocation")
+
+    with col_reset:
+        st.write("")  # Spacing
+        st.write("")
+        if st.button("🔄 Reset Broker", use_container_width=True):
+            broker.reset(initial_cash=1_000_000.0)
+            st.success("Broker reset to $1M cash")
+            st.rerun()
+
+    # -------------------------------
+    # EXECUTION HISTORY
+    # -------------------------------
+
+    st.markdown("---")
+    st.header("📜 Execution History")
+
+    exec_state = load_execution_state()
+    history = exec_state.get('execution_history', [])
+
+    if history:
+        history_df = pd.DataFrame(history)
+        history_df = history_df.sort_values('timestamp', ascending=False)
+
+        # Format for display
+        display_df = history_df.copy()
+        display_df['timestamp'] = pd.to_datetime(display_df['timestamp']).dt.strftime('%Y-%m-%d %H:%M')
+        display_df['success'] = display_df['success'].apply(lambda x: '✅' if x else '❌')
+
+        st.dataframe(
+            display_df[['timestamp', 'regime', 'success', 'trades', 'message']],
+            use_container_width=True,
+            hide_index=True
+        )
+
+        if st.button("Clear History"):
+            exec_state['execution_history'] = []
+            save_execution_state(exec_state)
+            st.rerun()
+    else:
+        st.info("No execution history yet")
+
+    # -------------------------------
+    # BROKER DETAILS
+    # -------------------------------
+
+    with st.expander("🔧 Paper Broker Details"):
+        broker_summary = broker.get_summary()
+        st.json(broker_summary)
+
+        st.subheader("Trade History")
+        if broker.trade_history:
+            for trade in reversed(broker.trade_history[-10:]):
+                st.write(f"  • {trade['timestamp'][:19]}: {trade['action']} ${trade['amount']:,.0f} {trade['asset']}")
+        else:
+            st.write("No trades yet")
+
+
+# -------------------------------
 # MAIN
 # -------------------------------
 
 if __name__ == "__main__":
     # Tab navigation
-    tab1, tab2 = st.tabs(["📊 Live Dashboard", "📜 Historical Backtest"])
+    tab1, tab2, tab3 = st.tabs(["📊 Live Dashboard", "🚀 Execution", "📜 Historical Backtest"])
 
     with tab1:
         render_dashboard()
 
     with tab2:
+        render_execution_page()
+
+    with tab3:
         render_backtest_page()
