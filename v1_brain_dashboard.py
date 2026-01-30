@@ -193,9 +193,9 @@ def render_sidebar():
             try:
                 run_brain_and_update()
                 st.sidebar.success("Brain executed!")
+                st.rerun()
             except Exception as e:
                 st.sidebar.error(f"Error: {e}")
-        st.rerun()
 
     st.sidebar.markdown("---")
 
@@ -993,9 +993,9 @@ def render_execution_page():
                 try:
                     run_brain_and_update()
                     st.success("Brain executed successfully!")
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Error running brain: {e}")
-            st.rerun()
 
     # Show engine weights from brain
     st.subheader("Brain Output: Engine Weights")
