@@ -190,7 +190,11 @@ def render_sidebar():
     st.sidebar.subheader("Manual Execution")
     if st.sidebar.button("🚀 Run V1 Brain Now", use_container_width=True):
         with st.spinner("Running V1 Brain..."):
-            run_brain_and_update()
+            try:
+                run_brain_and_update()
+                st.sidebar.success("Brain executed!")
+            except Exception as e:
+                st.sidebar.error(f"Error: {e}")
         st.rerun()
 
     st.sidebar.markdown("---")
@@ -986,7 +990,11 @@ def render_execution_page():
     with col2:
         if st.button("🧠 Run Brain Now", use_container_width=True, key="exec_run_brain"):
             with st.spinner("Running V1 Brain..."):
-                run_brain_and_update()
+                try:
+                    run_brain_and_update()
+                    st.success("Brain executed successfully!")
+                except Exception as e:
+                    st.error(f"Error running brain: {e}")
             st.rerun()
 
     # Show engine weights from brain
