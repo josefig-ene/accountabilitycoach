@@ -188,16 +188,26 @@ def render_sidebar():
 
     # Manual Run Button
     st.sidebar.subheader("Manual Execution")
+
+    # Show persistent success/error message from previous run
+    if st.session_state.get('brain_run_success'):
+        st.sidebar.success(st.session_state.brain_run_success)
+        del st.session_state.brain_run_success
+    if st.session_state.get('brain_run_error'):
+        st.sidebar.error(st.session_state.brain_run_error)
+        del st.session_state.brain_run_error
+
     if st.sidebar.button("🚀 Run V1 Brain Now", use_container_width=True):
         st.sidebar.info("Button clicked - running brain...")
         try:
             run_brain_and_update()
-            st.sidebar.success("Brain executed!")
+            st.session_state.brain_run_success = "Brain executed successfully!"
             st.rerun()
         except Exception as e:
-            st.sidebar.error(f"Error: {e}")
+            st.session_state.brain_run_error = f"Error: {e}"
             import traceback
-            st.sidebar.code(traceback.format_exc())
+            print(traceback.format_exc())  # Print to terminal
+            st.rerun()
 
     st.sidebar.markdown("---")
 
@@ -990,16 +1000,25 @@ def render_execution_page():
             st.caption(f"Last allocation: {brain_state['last_allocation_date']}")
 
     with col2:
+        # Show persistent success/error message
+        if st.session_state.get('exec_brain_success'):
+            st.success(st.session_state.exec_brain_success)
+            del st.session_state.exec_brain_success
+        if st.session_state.get('exec_brain_error'):
+            st.error(st.session_state.exec_brain_error)
+            del st.session_state.exec_brain_error
+
         if st.button("🧠 Run Brain Now", use_container_width=True, key="exec_run_brain"):
             st.info("Button clicked - running brain...")
             try:
                 run_brain_and_update()
-                st.success("Brain executed successfully!")
+                st.session_state.exec_brain_success = "Brain executed successfully!"
                 st.rerun()
             except Exception as e:
-                st.error(f"Error running brain: {e}")
+                st.session_state.exec_brain_error = f"Error: {e}"
                 import traceback
-                st.code(traceback.format_exc())
+                print(traceback.format_exc())  # Print to terminal
+                st.rerun()
 
     # Show engine weights from brain
     st.subheader("Brain Output: Engine Weights")
