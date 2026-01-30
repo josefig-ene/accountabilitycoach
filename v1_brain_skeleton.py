@@ -173,8 +173,8 @@ def allocate_capital(state, new_regime):
     today = datetime.date.today()
     last_alloc_date = state['last_allocation_date']
 
-    # Cooldown check
-    if last_alloc_date:
+    # Cooldown check - but SKIP cooldown if last_regime is None (initial setup)
+    if last_alloc_date and state['last_regime'] is not None:
         weeks_since = (today - datetime.datetime.fromisoformat(last_alloc_date).date()).days // 7
         if weeks_since < COOLDOWN_WEEKS:
             return state  # cooldown active
