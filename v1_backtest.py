@@ -1,6 +1,13 @@
 """
-V1 Brain Historical Backtest Loop
+V1 Brain Historical Backtest - CLI Tool Only
+
 Purpose: Validate allocator logic across historical data (1997-present)
+
+ISOLATION CONTRACT:
+- This is a STANDALONE CLI TOOL
+- NOT imported by the web app
+- NOT accessible from the web app
+- Run via: python v1_backtest.py
 
 ARCHITECTURE:
 - Uses SENSING_ASSETS (11 assets) for regime detection

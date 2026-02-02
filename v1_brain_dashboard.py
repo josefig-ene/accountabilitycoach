@@ -15,6 +15,11 @@ OPACITY CONTRACT:
   engine weights, or any intermediate signal
 - User sees the label, not the signal
 - No data that could allow inferring proximity to regime boundaries
+
+BACKTEST ISOLATION:
+- This web app has NO imports, pages, or references to backtesting
+- Backtesting exists ONLY as a separate CLI tool (v1_backtest.py)
+- The import chain is: dashboard -> brain_state_reader -> (stdlib only)
 """
 
 import streamlit as st
