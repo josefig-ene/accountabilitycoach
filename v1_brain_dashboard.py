@@ -66,10 +66,10 @@ _REGIME_LABELS = {
 }
 
 _REGIME_EXPLANATIONS = {
-    'RISK_ON': 'Conditions permit directional exposure. No action required.',
-    'RISK_NEUTRAL': 'Conditions are ambiguous. Defensive posture is appropriate.',
-    'RISK_OFF': 'Conditions favor capital preservation. Reduced exposure is appropriate.',
-    None: 'Regime has not yet been determined. Awaiting first scheduled update.'
+    'RISK_ON': 'Market environment is currently favorable.',
+    'RISK_NEUTRAL': 'Market environment is currently mixed.',
+    'RISK_OFF': 'Market environment is currently unfavorable.',
+    None: 'Awaiting first scheduled update.'
 }
 
 # -------------------------------
