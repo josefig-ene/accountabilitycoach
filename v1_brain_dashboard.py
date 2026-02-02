@@ -1,8 +1,8 @@
 """
-V1 Brain Dashboard - Opaque Regime Display
+V1 Regime Appliance - Read-Only Status Display
 
-This dashboard displays the current regime label and its semantic meaning.
-The UI is strictly read-only and regime output is OPAQUE.
+A minimal, informational display of the current regime.
+Designed to be boring, calm, and purely informational.
 
 ARCHITECTURAL CONSTRAINT:
 - Imports ONLY from brain_state_reader (read-only, opaque module)
@@ -20,12 +20,14 @@ BACKTEST ISOLATION:
 - This web app has NO imports, pages, or references to backtesting
 - Backtesting exists ONLY as a separate CLI tool (v1_backtest.py)
 - The import chain is: dashboard -> brain_state_reader -> (stdlib only)
+
+APPLIANCE DESIGN:
+- No charts, bars, or percentages
+- No urgency or call to action
+- Boring, calm, informational
 """
 
 import streamlit as st
-
-# CRITICAL: Import ONLY opaque accessor functions
-# These return ONLY label and date - no signals or intermediate values
 from brain_state_reader import get_current_regime, get_last_update_date
 
 # -------------------------------
@@ -33,79 +35,144 @@ from brain_state_reader import get_current_regime, get_last_update_date
 # -------------------------------
 
 st.set_page_config(
-    page_title="V1 Brain - Regime Status",
-    page_icon="🧠",
+    page_title="Regime Status",
+    page_icon="",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
+# Hide Streamlit UI elements for cleaner appliance look
+st.markdown(
+    """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stApp {background-color: #fafafa;}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # -------------------------------
-# REGIME DISPLAY CONSTANTS
+# REGIME DEFINITIONS
 # -------------------------------
 
-_REGIME_COLORS = {
-    'RISK_ON': '#00cc66',
-    'RISK_NEUTRAL': '#ffcc00',
-    'RISK_OFF': '#ff4444',
-    None: '#888888'
+_REGIME_LABELS = {
+    'RISK_ON': 'Risk-On',
+    'RISK_NEUTRAL': 'Risk-Neutral',
+    'RISK_OFF': 'Risk-Off',
+    None: 'Pending'
 }
 
-_REGIME_MEANINGS = {
-    'RISK_ON': 'Environment permits directional risk-taking',
-    'RISK_NEUTRAL': 'Defensive posture',
-    'RISK_OFF': 'Capital preservation priority',
-    None: 'Regime not yet determined'
+_REGIME_EXPLANATIONS = {
+    'RISK_ON': 'Conditions permit directional exposure. No action required.',
+    'RISK_NEUTRAL': 'Conditions are ambiguous. Defensive posture is appropriate.',
+    'RISK_OFF': 'Conditions favor capital preservation. Reduced exposure is appropriate.',
+    None: 'Regime has not yet been determined. Awaiting first scheduled update.'
 }
 
 # -------------------------------
 # MAIN DISPLAY
 # -------------------------------
 
-def render_regime_status():
+def render_appliance():
     """
-    Render the opaque regime status display.
+    Render the regime appliance display.
 
-    OPACITY: Displays only the discrete regime label and its meaning.
-    No volatility, thresholds, weights, or signals are shown.
+    Design: Boring, calm, informational.
+    No charts, no colors implying urgency, no action prompts.
     """
-    st.title("🧠 V1 Brain")
-    st.caption("Regime Status")
 
-    # Get opaque regime data (label and date only)
+    # Get opaque regime data
     regime = get_current_regime()
     last_date = get_last_update_date()
 
-    # Display regime label and meaning
-    regime_color = _REGIME_COLORS.get(regime, '#888888')
-    regime_meaning = _REGIME_MEANINGS.get(regime, 'Unknown')
-
+    # Appliance header
     st.markdown(
-        f"""
+        """
         <div style='
-            background-color: {regime_color};
-            padding: 40px;
-            border-radius: 15px;
             text-align: center;
-            margin: 20px 0;
+            padding: 40px 20px 20px 20px;
         '>
-            <p style='color: white; margin: 0; font-size: 18px; opacity: 0.9;'>
-                Current Regime
-            </p>
-            <p style='color: white; margin: 10px 0; font-size: 48px; font-weight: bold;'>
-                {regime or 'NOT SET'}
-            </p>
-            <p style='color: white; margin: 0; font-size: 16px; opacity: 0.9;'>
-                {regime_meaning}
+            <p style='
+                color: #666;
+                font-size: 14px;
+                margin: 0;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+            '>
+                Regime Status
             </p>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    if last_date:
-        st.caption(f"Last updated: {last_date}")
-    else:
-        st.caption("Awaiting first regime detection")
+    # Regime display - single dominant element
+    regime_label = _REGIME_LABELS.get(regime, 'Unknown')
+    regime_explanation = _REGIME_EXPLANATIONS.get(regime, '')
+
+    st.markdown(
+        f"""
+        <div style='
+            text-align: center;
+            padding: 30px 20px;
+            background-color: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin: 0 auto;
+            max-width: 400px;
+        '>
+            <p style='
+                color: #333;
+                font-size: 32px;
+                font-weight: 500;
+                margin: 0 0 16px 0;
+                font-family: system-ui, -apple-system, sans-serif;
+            '>
+                {regime_label}
+            </p>
+            <p style='
+                color: #666;
+                font-size: 14px;
+                margin: 0;
+                line-height: 1.5;
+            '>
+                {regime_explanation}
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Timestamp section
+    st.markdown(
+        f"""
+        <div style='
+            text-align: center;
+            padding: 30px 20px;
+            max-width: 400px;
+            margin: 0 auto;
+        '>
+            <p style='
+                color: #999;
+                font-size: 12px;
+                margin: 0 0 8px 0;
+            '>
+                Last updated: {last_date if last_date else 'Never'}
+            </p>
+            <p style='
+                color: #999;
+                font-size: 12px;
+                margin: 0;
+            '>
+                Next update: Weekly (Friday close)
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 # -------------------------------
@@ -113,4 +180,4 @@ def render_regime_status():
 # -------------------------------
 
 if __name__ == "__main__":
-    render_regime_status()
+    render_appliance()
