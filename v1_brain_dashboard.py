@@ -1,27 +1,27 @@
 """
-V1 Brain Dashboard - Read-Only Regime Display
+V1 Brain Dashboard - Opaque Regime Display
 
-This dashboard displays the current regime and its semantic meaning.
-The UI is strictly read-only and CANNOT trigger brain execution.
+This dashboard displays the current regime label and its semantic meaning.
+The UI is strictly read-only and regime output is OPAQUE.
 
 ARCHITECTURAL CONSTRAINT:
-- Imports ONLY from brain_state_reader (read-only module)
+- Imports ONLY from brain_state_reader (read-only, opaque module)
 - Has NO access to detect_regime, allocate_capital, or run_v1_brain
 - Contains NO buttons, forms, or controls that could trigger execution
-- The brain runs on an external schedule; this UI only reads state
 
-REGIME SAFETY CONTRACT:
-- Only displays regime label and semantic meaning
-- No volatility values, charts, thresholds, or distributions
-- No historical statistics or backtest results
-- No manual execution or intra-period refresh
+OPACITY CONTRACT:
+- Displays ONLY: regime label and semantic meaning
+- Does NOT display: volatility values, charts, thresholds, distributions,
+  engine weights, or any intermediate signal
+- User sees the label, not the signal
+- No data that could allow inferring proximity to regime boundaries
 """
 
 import streamlit as st
 
-# CRITICAL: Import ONLY from read-only module
-# This module has NO access to brain execution functions
-from brain_state_reader import read_regime_state
+# CRITICAL: Import ONLY opaque accessor functions
+# These return ONLY label and date - no signals or intermediate values
+from brain_state_reader import get_current_regime, get_last_update_date
 
 # -------------------------------
 # PAGE CONFIG
@@ -35,47 +35,44 @@ st.set_page_config(
 )
 
 # -------------------------------
-# REGIME DEFINITIONS (display only)
+# REGIME DISPLAY CONSTANTS
 # -------------------------------
 
-REGIME_COLORS = {
-    'RISK_ON': '#00cc66',       # Green
-    'RISK_NEUTRAL': '#ffcc00',  # Yellow
-    'RISK_OFF': '#ff4444',      # Red
-    None: '#888888'             # Gray
+_REGIME_COLORS = {
+    'RISK_ON': '#00cc66',
+    'RISK_NEUTRAL': '#ffcc00',
+    'RISK_OFF': '#ff4444',
+    None: '#888888'
 }
 
-REGIME_MEANINGS = {
+_REGIME_MEANINGS = {
     'RISK_ON': 'Environment permits directional risk-taking',
-    'RISK_NEUTRAL': 'Noise dominates - defensive posture',
+    'RISK_NEUTRAL': 'Defensive posture',
     'RISK_OFF': 'Capital preservation priority',
     None: 'Regime not yet determined'
 }
 
 # -------------------------------
-# MAIN DISPLAY (read-only)
+# MAIN DISPLAY
 # -------------------------------
 
 def render_regime_status():
     """
-    Render the regime status display.
+    Render the opaque regime status display.
 
-    This function is strictly read-only:
-    - Reads state from file via brain_state_reader
-    - Displays regime label and meaning
-    - Has NO access to brain execution functions
+    OPACITY: Displays only the discrete regime label and its meaning.
+    No volatility, thresholds, weights, or signals are shown.
     """
     st.title("🧠 V1 Brain")
-    st.caption("Regime Status (Read-Only)")
+    st.caption("Regime Status")
 
-    # Read current state (read-only operation)
-    state = read_regime_state()
-    regime = state.get('last_regime')
-    last_date = state.get('last_allocation_date')
+    # Get opaque regime data (label and date only)
+    regime = get_current_regime()
+    last_date = get_last_update_date()
 
-    # Display regime
-    regime_color = REGIME_COLORS.get(regime, '#888888')
-    regime_meaning = REGIME_MEANINGS.get(regime, 'Unknown regime')
+    # Display regime label and meaning
+    regime_color = _REGIME_COLORS.get(regime, '#888888')
+    regime_meaning = _REGIME_MEANINGS.get(regime, 'Unknown')
 
     st.markdown(
         f"""
@@ -100,7 +97,6 @@ def render_regime_status():
         unsafe_allow_html=True
     )
 
-    # Display last update date
     if last_date:
         st.caption(f"Last updated: {last_date}")
     else:
