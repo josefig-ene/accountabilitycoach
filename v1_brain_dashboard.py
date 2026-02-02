@@ -174,6 +174,45 @@ def render_appliance():
         unsafe_allow_html=True
     )
 
+    # Static disclaimer - always visible, not dismissible
+    st.markdown(
+        """
+        <div style='
+            text-align: center;
+            padding: 20px;
+            margin: 40px auto 20px auto;
+            max-width: 400px;
+            border-top: 1px solid #e0e0e0;
+        '>
+            <p style='
+                color: #999;
+                font-size: 11px;
+                margin: 0 0 6px 0;
+                line-height: 1.5;
+            '>
+                This system reports market environment only.
+            </p>
+            <p style='
+                color: #999;
+                font-size: 11px;
+                margin: 0 0 6px 0;
+                line-height: 1.5;
+            '>
+                It does not predict direction or timing.
+            </p>
+            <p style='
+                color: #999;
+                font-size: 11px;
+                margin: 0;
+                line-height: 1.5;
+            '>
+                No action is required or implied.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 
 # -------------------------------
 # MAIN
