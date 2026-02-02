@@ -1,8 +1,14 @@
 """
-V1 Brain Dashboard - Regime Display Only
+V1 Brain Dashboard - Read-Only Regime Display
 
 This dashboard displays the current regime and its semantic meaning.
-Regime detection runs on a fixed weekly cadence (read-only in UI).
+The UI is strictly read-only and CANNOT trigger brain execution.
+
+ARCHITECTURAL CONSTRAINT:
+- Imports ONLY from brain_state_reader (read-only module)
+- Has NO access to detect_regime, allocate_capital, or run_v1_brain
+- Contains NO buttons, forms, or controls that could trigger execution
+- The brain runs on an external schedule; this UI only reads state
 
 REGIME SAFETY CONTRACT:
 - Only displays regime label and semantic meaning
@@ -12,7 +18,10 @@ REGIME SAFETY CONTRACT:
 """
 
 import streamlit as st
-from v1_brain_skeleton import load_state
+
+# CRITICAL: Import ONLY from read-only module
+# This module has NO access to brain execution functions
+from brain_state_reader import read_regime_state
 
 # -------------------------------
 # PAGE CONFIG
@@ -26,7 +35,7 @@ st.set_page_config(
 )
 
 # -------------------------------
-# REGIME DEFINITIONS
+# REGIME DEFINITIONS (display only)
 # -------------------------------
 
 REGIME_COLORS = {
@@ -44,16 +53,23 @@ REGIME_MEANINGS = {
 }
 
 # -------------------------------
-# MAIN DISPLAY
+# MAIN DISPLAY (read-only)
 # -------------------------------
 
 def render_regime_status():
-    """Render the regime status display."""
-    st.title("🧠 V1 Brain")
-    st.caption("Regime Status")
+    """
+    Render the regime status display.
 
-    # Load current state (read-only)
-    state = load_state()
+    This function is strictly read-only:
+    - Reads state from file via brain_state_reader
+    - Displays regime label and meaning
+    - Has NO access to brain execution functions
+    """
+    st.title("🧠 V1 Brain")
+    st.caption("Regime Status (Read-Only)")
+
+    # Read current state (read-only operation)
+    state = read_regime_state()
     regime = state.get('last_regime')
     last_date = state.get('last_allocation_date')
 
